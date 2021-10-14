@@ -10,7 +10,7 @@ PASS is a large-scale image dataset that does not include any humans,
 human parts, or other personally identifiable information.
 It that can be used for high-quality self-supervised pretraining while significantly reducing privacy concerns.
 
-PASS contains 1.440.191 images without any labels sourced from YFCC-100M.
+PASS contains 1.439.719 images without any labels sourced from YFCC-100M.
 
 All images in this dataset are licenced under the CC-BY licence, as is the dataset itself.
 For YFCC-100M see  http://www.multimediacommons.org/.
@@ -37,9 +37,9 @@ _URLS = {
 class PASS(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for pass dataset."""
 
-    VERSION = tfds.core.Version('1.0.0')
+    VERSION = tfds.core.Version('2.0.0')
     RELEASE_NOTES = {
-        '1.0.0': 'Initial release.',
+        '2.0.0': 'v2: Removed 472 images from v1 as they contained humans. Also added metadata: datetaken and GPS.',
     }
 
     def _info(self):
@@ -48,8 +48,12 @@ class PASS(tfds.core.GeneratorBasedBuilder):
             builder=self,
             description=_DESCRIPTION,
             features=tfds.features.FeaturesDict({
-                'image': tfds.features.Image(shape=(None, None, 3)),
-                'image/creator_uname': tf.string,
+                'image': tfds.features.Image(shape=(None, None, 3)),      # the image
+                'image/creator_uname': tf.string,                         # the photographer/creator
+                'image/hash':tf.string,                                   # the hash, as computed from YFCC-100M
+                'image/gps_lon':tf.float,                                 # Longitude of image if existent, otw. NaN
+                'image/gps_lat':tf.float,                                 # Latitude of image if existent, otw. NaN
+                'image/date_taken': pd._libs.tslibs.timestamps.Timestamp, # datetime of image
             }),
             supervised_keys=None,
             homepage='https://www.robots.ox.ac.uk/~vgg/research/pass/',
@@ -61,7 +65,7 @@ class PASS(tfds.core.GeneratorBasedBuilder):
         paths = dl_manager.download(_URLS)
         with tf.io.gfile.GFile(paths['meta_data']) as f:
             meta = pd.read_csv(f)
-        meta = {m[1]['hash']:m[1]['unickname'] for m in meta.iterrows()}
+        meta = meta.set_index('hash')
         return [tfds.core.SplitGenerator(
             name=tfds.Split.TRAIN,
             gen_kwargs=dict(
@@ -77,8 +81,14 @@ class PASS(tfds.core.GeneratorBasedBuilder):
         for part in parts:
             for fname, fobj in dl_manager.iter_archive(part):
                 _idx += 1
+                img_hash = fname.split('/')[-1].split('.')[0]
+                meta = meta.loc[img_hash]
                 record = {
                     "image": fobj,
-                    "image/creator_uname": meta[fname.split('/')[-1].split('.')[0]]
+                    "image/creator_uname": meta['unickname'],
+                    "image/hash": img_hash,
+                    "image/gps_lon": meta['longitude'],
+                    "image/gps_lat": meta['latitude'],
+                    "image/date_taken": pd.to_datetime(meta['datetime']),
                 }
                 yield _idx, record
