@@ -1,7 +1,6 @@
 """PASS dataset."""
 
 import tensorflow_datasets as tfds
-import urllib.request
 import tensorflow.compat.v2 as tf
 pd = tfds.core.lazy_imports.pandas
 
@@ -10,7 +9,7 @@ PASS is a large-scale image dataset that does not include any humans,
 human parts, or other personally identifiable information.
 It that can be used for high-quality self-supervised pretraining while significantly reducing privacy concerns.
 
-PASS contains 1.439.719 images without any labels sourced from YFCC-100M.
+PASS contains 1,439,719 images without any labels sourced from YFCC-100M.
 
 All images in this dataset are licenced under the CC-BY licence, as is the dataset itself.
 For YFCC-100M see  http://www.multimediacommons.org/.
@@ -27,11 +26,11 @@ year = "2021"
 
 _URLS = {
     'train_images': [tfds.download.Resource(  # pylint:disable=g-complex-comprehension
-        url='https://zenodo.org/record/5528345/files/PASS.%s.tar' % i_,
+        url='https://zenodo.org/record/5570664/files/PASS.%s.tar' % i_,
         extract_method=tfds.download.ExtractMethod.TAR)
         for i_ in '0123456789'],
     'meta_data':tfds.download.Resource(
-        url='https://zenodo.org/record/5528345/files/pass_metadata.csv')
+        url='https://zenodo.org/record/5570664/files/pass_metadata.csv')
 }
 
 class PASS(tfds.core.GeneratorBasedBuilder):
@@ -39,7 +38,7 @@ class PASS(tfds.core.GeneratorBasedBuilder):
 
     VERSION = tfds.core.Version('2.0.0')
     RELEASE_NOTES = {
-        '2.0.0': 'v2: Removed 472 images from v1 as they contained humans. Also added metadata: datetaken and GPS.',
+        '2.0.0': 'v2: Removed 472 images from v1 as they contained humans. Also added metadata: datetaken and GPS. ',
     }
 
     def _info(self):
