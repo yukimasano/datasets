@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -82,7 +82,7 @@ class DolphinNumberWord(tfds.core.GeneratorBasedBuilder):
   def _generate_examples(self, json_paths, split):
     """Parses available JSON files in a given split, returns TF examples."""
     # Currently assume all files in archive are json-formatted.
-    for file in json_paths.glob('*' + split + '*'):
+    for file in json_paths.glob('*' + split + '*'):  # pytype: disable=attribute-error  # gen-stub-imports
       json_string = file.read_text()
       examples = json.loads(json_string)
       for e in examples:

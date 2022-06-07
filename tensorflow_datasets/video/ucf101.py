@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -136,7 +136,7 @@ class Ucf101(tfds.core.GeneratorBasedBuilder):
             tfds.features.Video(
                 video_shape,
                 ffmpeg_extra_args=ffmpeg_extra_args,
-                encoding_format='jpeg'),
+                encoding_format='jpeg'),  # pytype: disable=wrong-arg-types  # gen-stub-imports
         'label':
             tfds.features.ClassLabel(names_file=labels_names_file),
     })

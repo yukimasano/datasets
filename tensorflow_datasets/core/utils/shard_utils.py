@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,9 +21,8 @@ This logic is shared between:
  sharding needs.
 """
 
-from typing import Any, List, Sequence
-
 import dataclasses
+from typing import Any, List, Sequence
 
 
 @dataclasses.dataclass(eq=True, frozen=True)
@@ -31,11 +30,11 @@ class FileInstruction(object):
   """Instruction to read a single shard/file.
 
   Attributes:
-    filename: The filenames contains the relative path, not absolute.
+    filename: The filename containing the relative path, not absolute.
     skip: Indicates which example read in the shard (`ds.skip().take()`). `0` if
-      no skipping
-    take: Indicates how many examples to read (`-1` to read all)
-    num_examples: `int`, The total number of examples
+      no skipping.
+    take: Indicates how many examples to read (`-1` to read all).
+    num_examples: `int`, The total number of examples.
   """
   filename: str
   skip: int

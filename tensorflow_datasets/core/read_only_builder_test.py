@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,22 +18,33 @@
 import functools
 import os
 import pathlib
+from typing import Sequence
 from unittest import mock
 
 import dill
 import pytest
+import tensorflow as tf
 
 from tensorflow_datasets import testing
 from tensorflow_datasets.core import constants
 from tensorflow_datasets.core import dataset_builder
 from tensorflow_datasets.core import dataset_utils
 from tensorflow_datasets.core import load
+from tensorflow_datasets.core import proto
 from tensorflow_datasets.core import read_only_builder
 from tensorflow_datasets.core import registered
+from tensorflow_datasets.core import splits as splits_lib
+from tensorflow_datasets.core import utils
+from tensorflow_datasets.core.features import features_dict
+from tensorflow_datasets.core.proto import dataset_info_pb2
+from tensorflow_datasets.core.utils import file_utils
+
+from google.protobuf import json_format
 
 
 class DummyNoConfMnist(testing.DummyDataset):
   """Same as DummyMnist (but declared here to avoid skip_registering issues)."""
+  VERSION = utils.Version('0.1.0')
 
 
 class DummyConfigMnist(testing.DummyDataset):
@@ -43,11 +54,13 @@ class DummyConfigMnist(testing.DummyDataset):
       dataset_builder.BuilderConfig(
           name='dummy_config',
           version='0.1.0',
+          release_notes={'0.1.0': 'Release notes 0.1.0'},
           description='testing config',
       ),
       dataset_builder.BuilderConfig(
           name='dummy_config2',
           version='0.1.0',
+          release_notes={'0.1.0': 'Release notes 0.1.0'},
           description='testing config',
       ),
   ]
@@ -142,7 +155,7 @@ def test_builder_code_not_found(code_builder: dataset_builder.DatasetBuilder):
 
 
 # Test both with and without config
-def test_read_only_builder(code_builder: dataset_builder.DatasetBuilder):
+def test_builder_from_directory(code_builder: dataset_builder.DatasetBuilder):
   """Builder can be created from the files only."""
 
   # Reconstruct the dataset
@@ -153,6 +166,7 @@ def test_read_only_builder(code_builder: dataset_builder.DatasetBuilder):
   assert builder.info.full_name == code_builder.info.full_name
   assert repr(builder.info) == repr(code_builder.info)
   assert builder.VERSION == code_builder.info.version
+  assert builder.RELEASE_NOTES == code_builder.info.release_notes
   assert builder.__module__ == type(code_builder).__module__
   assert read_only_builder.ReadOnlyBuilder.VERSION is None
 
@@ -178,7 +192,40 @@ def test_read_only_builder(code_builder: dataset_builder.DatasetBuilder):
   assert builder.version == builder2.version
 
 
-def test_read_only_builder_multi_dir(
+def test_builder_from_metadata(code_builder: dataset_builder.DatasetBuilder):
+  features = features_dict.FeaturesDict({
+      'a': tf.float32,
+      'b': tf.string,
+  })
+  info_proto = dataset_info_pb2.DatasetInfo(
+      name='abcd',
+      description='efgh',
+      config_name='en',
+      config_description='something',
+      version='0.1.0',
+      release_notes={'0.1.0': 'release description'},
+      citation='some citation',
+      features=features.to_proto())
+  builder = read_only_builder.builder_from_metadata(
+      code_builder.data_dir, info_proto=info_proto)
+  assert builder.name == info_proto.name
+  assert builder.info.description == info_proto.description
+  assert builder.info.citation == info_proto.citation
+  assert builder.info.version == info_proto.version
+  assert builder.builder_config
+  assert builder.builder_config.name == info_proto.config_name
+  assert builder.builder_config.version == info_proto.version
+  assert builder.builder_config.description == info_proto.config_description
+  assert builder.builder_config.release_notes == info_proto.release_notes
+  assert str(builder.info.features) == str(features)
+
+
+def test_builder_from_directory_dir_not_exists(tmp_path: pathlib.Path):
+  with pytest.raises(FileNotFoundError, match='Could not load dataset info'):
+    read_only_builder.builder_from_directory(tmp_path)
+
+
+def test_builder_from_files_multi_dir(
     code_builder: dataset_builder.DatasetBuilder,
     tmp_path: pathlib.Path,
 ):
@@ -193,12 +240,6 @@ def test_read_only_builder_multi_dir(
   )
   assert builder.name == code_builder.name
   assert builder.data_dir == code_builder.data_dir
-
-
-def test_not_exists(tmp_path: pathlib.Path):
-  with pytest.raises(
-      FileNotFoundError, match='Could not load `ReadOnlyBuilder`'):
-    read_only_builder.builder_from_directory(tmp_path)
 
 
 def test_not_registered():
@@ -218,7 +259,7 @@ def test_find_builder_dir_with_multiple_data_dir(mock_fs: testing.MockFs):
   assert read_only_builder._find_builder_dir('ds0') is None
 
   with mock.patch.object(
-      constants,
+      file_utils,
       'list_data_dirs',
       return_value=[constants.DATA_DIR, 'path/to'],
   ):
@@ -353,3 +394,80 @@ def test_get_version_str(mock_fs: testing.MockFs):
   assert _find_builder_dir('ds:1.0.0') == 'path/to/ds/1.0.0'
   assert _find_builder_dir('ds:1.3.*') is None
   assert _find_builder_dir('ds:2.3.5') is None
+
+
+def test_builder_from_directories_splits(mock_fs: testing.MockFs):
+
+  def split_for(name: str, shard_lengths: Sequence[int]) -> proto.SplitInfo:
+    return proto.SplitInfo(name=name, shard_lengths=shard_lengths)
+
+  def dataset_info(splits):
+    text_feature = proto.feature_pb2.Feature(
+        python_class_name='tensorflow_datasets.core.features.text_feature.Text',
+        text=proto.feature_pb2.TextFeature())
+    features = proto.feature_pb2.Feature(
+        python_class_name='tensorflow_datasets.core.features.features_dict.FeaturesDict',
+        features_dict=proto.feature_pb2.FeaturesDict(
+            features={'text': text_feature}))
+    return proto.dataset_info_pb2.DatasetInfo(
+        name='ds_name',
+        version='1.0.0',
+        file_format='tfrecord',
+        splits=splits,
+        features=features)
+
+  split_train_1 = split_for('train', [4, 5])
+  split_test_1 = split_for('test', [3])
+
+  split_train_2 = split_for('train', [3, 7])
+  builder_dirs = {
+      '/path/dataset/a': dataset_info([split_train_1, split_test_1]),
+      '/path/dataset/b': dataset_info([split_train_2]),
+  }
+  for builder_dir, di_proto in builder_dirs.items():
+    content = json_format.MessageToJson(di_proto, sort_keys=True)
+    mock_fs.add_file(path=f'{builder_dir}/dataset_info.json', content=content)
+
+  result = read_only_builder.builder_from_directories(list(builder_dirs.keys()))
+
+  assert isinstance(result, read_only_builder.ReadOnlyBuilder)
+  assert isinstance(result.info.splits['train'], splits_lib.MultiSplitInfo)
+  assert isinstance(result.info.splits['test'], splits_lib.MultiSplitInfo)
+
+  assert str(result.info.splits['test']) == (
+      'MultiSplitInfo(name=\'test\', '
+      'split_infos=[<SplitInfo num_examples=3, num_shards=1>])')
+  assert str(result.info.splits['train']) == (
+      'MultiSplitInfo(name=\'train\', split_infos=['
+      '<SplitInfo num_examples=9, num_shards=2>, '
+      '<SplitInfo num_examples=10, num_shards=2>])')
+
+
+def test_builder_from_directories_reading(
+    code_builder: dataset_builder.DatasetBuilder):
+  other_dir1 = f'{code_builder.data_dir}/other1'
+  other_dir2 = f'{code_builder.data_dir}/other2'
+
+  # Copy from code_builder dir to the new dirs.
+  tf.io.gfile.makedirs(other_dir1)
+  tf.io.gfile.makedirs(other_dir2)
+  for filename in tf.io.gfile.listdir(code_builder.data_dir):
+    filepath = f'{code_builder.data_dir}/{filename}'
+    if not tf.io.gfile.isdir(filepath):
+      tf.io.gfile.copy(
+          src=filepath, dst=f'{other_dir1}/{filename}', overwrite=True)
+      tf.io.gfile.copy(
+          src=filepath, dst=f'{other_dir2}/{filename}', overwrite=True)
+
+  builder = read_only_builder.builder_from_directories(
+      [other_dir1, other_dir2, code_builder.data_dir])
+  train_np = dataset_utils.as_numpy(builder.as_dataset(split='train'))
+  assert len(train_np) == 9
+  ds = dataset_utils.as_numpy(builder.as_dataset(split='train').take(5))
+  assert len(ds) == 5
+
+  # Test split 'all'
+  train_np = dataset_utils.as_numpy(builder.as_dataset(split='all'))
+  assert len(train_np) == 9
+  ds = dataset_utils.as_numpy(builder.as_dataset(split='all').take(5))
+  assert len(ds) == 5

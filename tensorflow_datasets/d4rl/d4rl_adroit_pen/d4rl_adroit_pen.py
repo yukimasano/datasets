@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,15 +38,15 @@ class D4rlAdroitPen(dataset_builder.D4RLDatasetBuilder):
           dataset_dir='hand_dapg_v1',
           env='adroit',
           file_suffix='-expert-v1',
-          step_metadata_keys=set([
+          step_metadata_keys=frozenset([
               dataset_builder._QPOS, dataset_builder._QVEL,
               dataset_builder._ADROIT_BODY_POS, dataset_builder._ACTION_MEAN,
               dataset_builder._ACTION_LOG_STD
           ]),
-          episode_metadata_keys=set([dataset_builder._ALGORITHM]),
+          episode_metadata_keys=frozenset([dataset_builder._ALGORITHM]),
           has_policy_metadata=True,
           has_policy_last_fc_log_std=True,
-          policy_size=64,
+          policy_size=64,  # pytype: disable=wrong-arg-types  # gen-stub-imports
       ),
   ]
 

@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -96,6 +96,6 @@ def test_toml_valid():
   """Makes sure that reading the `.toml` file is valid."""
   config = toml.load(export_community_datasets._IN_PATH)
   _ = {
-      namespace: tfds.core.as_path(src_code_path)
+      namespace: tfds.core.Path(src_code_path)
       for namespace, src_code_path in config['Namespaces'].items()
   }

@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ _CITATION = """\
 _DESCRIPTION = """\
 LibriSpeech is a corpus of approximately 1000 hours of read English speech with sampling rate of 16 kHz,
 prepared by Vassil Panayotov with the assistance of Daniel Povey. The data is derived from read
-audiobooks from the LibriVox project, and has been carefully segmented and aligned.87
+audiobooks from the LibriVox project, and has been carefully segmented and aligned.
 """
 
 _URL = "http://www.openslr.org/12"

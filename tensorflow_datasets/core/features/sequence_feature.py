@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 
 """Sequence feature."""
 
-from typing import Optional
+from typing import List, Optional, Union
 
 import numpy as np
 import tensorflow as tf
@@ -25,6 +25,8 @@ from tensorflow_datasets.core.features import feature as feature_lib
 from tensorflow_datasets.core.features import features_dict
 from tensorflow_datasets.core.features import tensor_feature
 from tensorflow_datasets.core.features import top_level_feature
+from tensorflow_datasets.core.proto import feature_pb2
+from tensorflow_datasets.core.utils import py_utils
 from tensorflow_datasets.core.utils import type_utils
 
 Json = type_utils.Json
@@ -87,17 +89,20 @@ class Sequence(top_level_feature.TopLevelFeature):
       self,
       feature: feature_lib.FeatureConnectorArg,
       length: Optional[int] = None,
+      *,
+      doc: feature_lib.DocArg = None,
   ):
     """Construct a sequence dict.
 
     Args:
       feature: The features to wrap (any feature supported)
       length: `int`, length of the sequence if static and known in advance
+      doc: Documentation of this feature (e.g. description).
     """
     # Convert {} => FeaturesDict, tf.int32 => Tensor(shape=(), dtype=tf.int32)
     self._feature = features_dict.to_feature(feature)
     self._length = length
-    super(Sequence, self).__init__()
+    super(Sequence, self).__init__(doc=doc)
 
   @property
   def feature(self):
@@ -111,12 +116,14 @@ class Sequence(top_level_feature.TopLevelFeature):
     tensor_info.sequence_rank += 1
     return tensor_info
 
+  @py_utils.memoize()
   def get_tensor_info(self):
     """See base class for details."""
     # Add the additional length dimension to every shape
     tensor_info = self._feature.get_tensor_info()
     return tf.nest.map_structure(self._add_length_dim, tensor_info)
 
+  @py_utils.memoize()
   def get_serialized_info(self):
     """See base class for details."""
     # Add the additional length dimension to every serialized features
@@ -195,29 +202,66 @@ class Sequence(top_level_feature.TopLevelFeature):
       inner_feature_repr = inner_feature_repr[len('FeaturesDict('):-len(')')]
     return '{}({})'.format(type(self).__name__, inner_feature_repr)
 
+  def catalog_documentation(
+      self) -> List[feature_lib.CatalogFeatureDocumentation]:
+    sub_feature_docs = self._feature.catalog_documentation()
+
+    # If it's a sequence of a single feature, then we add more details.
+    if len(sub_feature_docs) == 1:
+      sub_feature_doc = sub_feature_docs[0]
+      return [
+          sub_feature_doc.replace(
+              # Embed type of feature in class name, e.g. Sequence(tf.int64)
+              cls_name=f'{type(self).__name__}({sub_feature_doc.cls_name})',
+              tensor_info=self._add_length_dim(sub_feature_doc.tensor_info),
+              description=self._doc.desc or sub_feature_doc.description,
+              value_range=self._doc.value_range or sub_feature_doc.value_range,
+          )
+      ]
+
+    result = []
+    for documentation in sub_feature_docs:
+      if not documentation.name:
+        # Override the nested FeaturesDict to become a Sequence.
+        documentation = documentation.replace(
+            cls_name=type(self).__name__,
+            description=self._doc.desc or documentation.description,
+            value_range=self._doc.value_range or documentation.value_range,
+        )
+      result.append(documentation)
+    return result
+
   @classmethod
-  def from_json_content(cls, value: Json) -> 'Sequence':
+  def from_json_content(
+      cls,
+      value: Union[Json, feature_pb2.Sequence],
+  ) -> 'Sequence':
+    if isinstance(value, dict):
+      # For backwards compatibility
+      return cls(
+          feature=feature_lib.FeatureConnector.from_json(value['feature']),
+          length=value['length'])
     return cls(
-        feature=feature_lib.FeatureConnector.from_json(value['feature']),
-        length=value['length'])
+        feature=feature_lib.FeatureConnector.from_proto(value.feature),
+        length=None if value.length == -1 else value.length)
 
-  def to_json_content(self) -> Json:
-    return {
-        'feature': self.feature.to_json(),
-        'length': self._length,
-    }
+  def to_json_content(self) -> feature_pb2.Sequence:
+    return feature_pb2.Sequence(
+        feature=self.feature.to_proto(),
+        length=-1 if self._length is None else self._length,
+    )
 
 
-def build_empty_np(serialized_info):
+def build_empty_np(serialized_info: feature_lib.TensorInfo):
   """Build empty sequence with the shape of serialized_info."""
   return np.empty(
       shape=tuple(s if s else 0 for s in serialized_info.shape),
-      dtype=serialized_info.dtype.as_numpy_dtype,
+      dtype=serialized_info.numpy_dtype,
   )
 
 
 def stack_nested(sequence_elements):
-  """Recursivelly stack the tensors from the same dict field."""
+  """Recursively stack the tensors from the same dict field."""
   if isinstance(sequence_elements[0], dict):
     return {
         # Stack along the first dimension
@@ -227,7 +271,7 @@ def stack_nested(sequence_elements):
   # Note: As each field can be a nested ragged list, we don't check here
   # that all elements from the list have matching dtype/shape.
   # Checking is done in `example_serializer` when elements
-  # are converted to numpy array and stacked togethers.
+  # are converted to numpy array and stacked together.
   return list(sequence_elements)
 
 

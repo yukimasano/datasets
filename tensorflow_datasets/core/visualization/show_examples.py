@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -129,6 +129,6 @@ def show_statistics(
 
   # Creates the statistics.
   statistics = statistics_pb2.DatasetFeatureStatisticsList()
-  statistics.datasets.add().CopyFrom(ds_info.splits[split].statistics)
+  statistics.datasets.add().CopyFrom(ds_info.splits[split].statistics)  # pytype: disable=attribute-error  # bind-properties
   with utils.disable_logging() if disable_logging else utils.nullcontext():
     return tfdv.visualize_statistics(statistics)

@@ -40,6 +40,8 @@ toc:
     title: voxceleb (manual)
   - path: /datasets/catalog/voxforge
     title: voxforge (manual)
+  - path: /datasets/catalog/xtreme_s
+    title: xtreme_s
   - path: /datasets/catalog/yes_no
     title: yes_no
   title: Audio
@@ -52,6 +54,8 @@ toc:
     title: d4rl_adroit_pen
   - path: /datasets/catalog/d4rl_adroit_relocate
     title: d4rl_adroit_relocate
+  - path: /datasets/catalog/d4rl_antmaze
+    title: d4rl_antmaze
   - path: /datasets/catalog/d4rl_mujoco_ant
     title: d4rl_mujoco_ant
   - path: /datasets/catalog/d4rl_mujoco_halfcheetah
@@ -62,6 +66,8 @@ toc:
     title: d4rl_mujoco_walker2d
   title: D4rl
 - section:
+  - path: /datasets/catalog/cardiotox
+    title: cardiotox
   - path: /datasets/catalog/ogbg_molpcba
     title: ogbg_molpcba
   title: Graphs
@@ -104,6 +110,8 @@ toc:
     title: lsun
   - path: /datasets/catalog/nyu_depth_v2
     title: nyu_depth_v2
+  - path: /datasets/catalog/pass
+    title: pass
   - path: /datasets/catalog/s3o4d
     title: s3o4d
   - path: /datasets/catalog/scene_parse150
@@ -118,6 +126,8 @@ toc:
 - section:
   - path: /datasets/catalog/beans
     title: beans
+  - path: /datasets/catalog/bee_dataset
+    title: bee_dataset
   - path: /datasets/catalog/bigearthnet
     title: bigearthnet
   - path: /datasets/catalog/binary_alpha_digits
@@ -162,6 +172,8 @@ toc:
     title: diabetic_retinopathy_detection (manual)
   - path: /datasets/catalog/dmlab
     title: dmlab
+  - path: /datasets/catalog/domainnet
+    title: domainnet
   - path: /datasets/catalog/dtd
     title: dtd
   - path: /datasets/catalog/emnist
@@ -178,10 +190,14 @@ toc:
     title: horses_or_humans
   - path: /datasets/catalog/i_naturalist2017
     title: i_naturalist2017
+  - path: /datasets/catalog/i_naturalist2018
+    title: i_naturalist2018
   - path: /datasets/catalog/imagenet2012
     title: imagenet2012 (manual)
   - path: /datasets/catalog/imagenet2012_corrupted
     title: imagenet2012_corrupted (manual)
+  - path: /datasets/catalog/imagenet2012_fewshot
+    title: imagenet2012_fewshot (manual)
   - path: /datasets/catalog/imagenet2012_multilabel
     title: imagenet2012_multilabel (manual)
   - path: /datasets/catalog/imagenet2012_real
@@ -190,10 +206,14 @@ toc:
     title: imagenet2012_subset (manual)
   - path: /datasets/catalog/imagenet_a
     title: imagenet_a
+  - path: /datasets/catalog/imagenet_lt
+    title: imagenet_lt (manual)
   - path: /datasets/catalog/imagenet_r
     title: imagenet_r
   - path: /datasets/catalog/imagenet_resized
     title: imagenet_resized
+  - path: /datasets/catalog/imagenet_sketch
+    title: imagenet_sketch
   - path: /datasets/catalog/imagenet_v2
     title: imagenet_v2
   - path: /datasets/catalog/imagenette
@@ -258,6 +278,14 @@ toc:
     title: visual_domain_decathlon
   title: Image classification
 - section:
+  - path: /datasets/catalog/deep1b
+    title: deep1b
+  - path: /datasets/catalog/glove100_angular
+    title: glove100_angular
+  - path: /datasets/catalog/sift1m
+    title: sift1m
+  title: Nearest neighbors
+- section:
   - path: /datasets/catalog/coco
     title: coco
   - path: /datasets/catalog/coco_captions
@@ -282,6 +310,10 @@ toc:
     title: ai2_arc
   - path: /datasets/catalog/ai2_arc_with_ir
     title: ai2_arc_with_ir
+  - path: /datasets/catalog/answer_equivalence
+    title: answer_equivalence
+  - path: /datasets/catalog/asqa
+    title: asqa
   - path: /datasets/catalog/coqa
     title: coqa
   - path: /datasets/catalog/cosmos_qa
@@ -308,8 +340,28 @@ toc:
     title: xquad
   title: Question answering
 - section:
+  - path: /datasets/catalog/istella
+    title: istella
+  - path: /datasets/catalog/mslr_web
+    title: mslr_web
+  title: Ranking
+- section:
+  - path: /datasets/catalog/criteo
+    title: criteo
+  - path: /datasets/catalog/hillstrom
+    title: hillstrom
+  - path: /datasets/catalog/simpte
+    title: simpte (manual)
+  title: Recommendation
+- section:
   - path: /datasets/catalog/rlu_atari
     title: rlu_atari
+  - path: /datasets/catalog/rlu_atari_checkpoints
+    title: rlu_atari_checkpoints
+  - path: /datasets/catalog/rlu_atari_checkpoints_ordered
+    title: rlu_atari_checkpoints_ordered
+  - path: /datasets/catalog/rlu_control_suite
+    title: rlu_control_suite
   - path: /datasets/catalog/rlu_dmlab_explore_object_rewards_few
     title: rlu_dmlab_explore_object_rewards_few
   - path: /datasets/catalog/rlu_dmlab_explore_object_rewards_many
@@ -320,24 +372,40 @@ toc:
     title: rlu_dmlab_rooms_watermaze
   - path: /datasets/catalog/rlu_dmlab_seekavoid_arena01
     title: rlu_dmlab_seekavoid_arena01
+  - path: /datasets/catalog/rlu_locomotion
+    title: rlu_locomotion
   - path: /datasets/catalog/rlu_rwrl
-    status: nightly
     title: rlu_rwrl
   title: Rl unplugged
 - section:
+  - path: /datasets/catalog/locomotion
+    title: locomotion
   - path: /datasets/catalog/robosuite_panda_pick_place_can
-    status: nightly
     title: robosuite_panda_pick_place_can
   title: Rlds
 - section:
+  - path: /datasets/catalog/robomimic_ph
+    title: robomimic_ph
+  title: Robomimic
+- section:
+  - path: /datasets/catalog/mt_opt
+    title: mt_opt
+  title: Robotics
+- section:
   - path: /datasets/catalog/amazon_us_reviews
     title: amazon_us_reviews
+  - path: /datasets/catalog/ble_wind_field
+    title: ble_wind_field
   - path: /datasets/catalog/cherry_blossoms
     title: cherry_blossoms
   - path: /datasets/catalog/covid19
     title: covid19
+  - path: /datasets/catalog/cs_restaurants
+    title: cs_restaurants
   - path: /datasets/catalog/dart
     title: dart
+  - path: /datasets/catalog/diamonds
+    title: diamonds
   - path: /datasets/catalog/e2e_cleaned
     title: e2e_cleaned
   - path: /datasets/catalog/efron_morris75
@@ -361,7 +429,6 @@ toc:
   - path: /datasets/catalog/movielens
     title: movielens
   - path: /datasets/catalog/penguins
-    status: nightly
     title: penguins
   - path: /datasets/catalog/protein_net
     title: protein_net
@@ -371,6 +438,8 @@ toc:
     title: rock_you
   - path: /datasets/catalog/titanic
     title: titanic
+  - path: /datasets/catalog/web_graph
+    title: web_graph
   - path: /datasets/catalog/web_nlg
     title: web_nlg
   - path: /datasets/catalog/wiki_bio
@@ -390,7 +459,6 @@ toc:
   - path: /datasets/catalog/billsum
     title: billsum
   - path: /datasets/catalog/booksum
-    status: nightly
     title: booksum (manual)
   - path: /datasets/catalog/cnn_dailymail
     title: cnn_dailymail
@@ -398,6 +466,10 @@ toc:
     title: covid19sum (manual)
   - path: /datasets/catalog/gigaword
     title: gigaword
+  - path: /datasets/catalog/gov_report
+    title: gov_report
+  - path: /datasets/catalog/media_sum
+    title: media_sum (manual)
   - path: /datasets/catalog/multi_news
     title: multi_news
   - path: /datasets/catalog/newsroom
@@ -426,6 +498,10 @@ toc:
     title: ag_news_subset
   - path: /datasets/catalog/anli
     title: anli
+  - path: /datasets/catalog/assin2
+    title: assin2
+  - path: /datasets/catalog/beir
+    title: beir
   - path: /datasets/catalog/blimp
     title: blimp
   - path: /datasets/catalog/bool_q
@@ -462,6 +538,8 @@ toc:
     title: goemotions
   - path: /datasets/catalog/gpt3
     title: gpt3
+  - path: /datasets/catalog/gsm8k
+    title: gsm8k
   - path: /datasets/catalog/hellaswag
     title: hellaswag
   - path: /datasets/catalog/imdb_reviews
@@ -476,8 +554,12 @@ toc:
     title: lm1b
   - path: /datasets/catalog/math_dataset
     title: math_dataset
+  - path: /datasets/catalog/math_qa
+    title: math_qa
   - path: /datasets/catalog/movie_rationales
     title: movie_rationales
+  - path: /datasets/catalog/mrqa
+    title: mrqa
   - path: /datasets/catalog/multi_nli
     title: multi_nli
   - path: /datasets/catalog/multi_nli_mismatch
@@ -496,6 +578,8 @@ toc:
     title: qa4mre
   - path: /datasets/catalog/quac
     title: quac
+  - path: /datasets/catalog/quality
+    title: quality
   - path: /datasets/catalog/race
     title: race
   - path: /datasets/catalog/reddit_disentanglement
@@ -506,12 +590,18 @@ toc:
     title: scan
   - path: /datasets/catalog/schema_guided_dialogue
     title: schema_guided_dialogue
+  - path: /datasets/catalog/sci_tail
+    title: sci_tail
   - path: /datasets/catalog/scicite
     title: scicite
+  - path: /datasets/catalog/scrolls
+    title: scrolls
   - path: /datasets/catalog/sentiment140
     title: sentiment140
   - path: /datasets/catalog/snli
     title: snli
+  - path: /datasets/catalog/squad_question_generation
+    title: squad_question_generation
   - path: /datasets/catalog/star_cfq
     title: star_cfq
   - path: /datasets/catalog/story_cloze
@@ -522,8 +612,12 @@ toc:
     title: tiny_shakespeare
   - path: /datasets/catalog/trec
     title: trec
+  - path: /datasets/catalog/unified_qa
+    title: unified_qa
   - path: /datasets/catalog/wiki40b
     title: wiki40b
+  - path: /datasets/catalog/wiki_dialog
+    title: wiki_dialog
   - path: /datasets/catalog/wikiann
     title: wikiann
   - path: /datasets/catalog/wikipedia
@@ -545,6 +639,16 @@ toc:
   - path: /datasets/catalog/yelp_polarity_reviews
     title: yelp_polarity_reviews
   title: Text
+- section:
+  - path: /datasets/catalog/asset
+    title: asset
+  - path: /datasets/catalog/wiki_auto
+    title: wiki_auto
+  title: Text simplification
+- section:
+  - path: /datasets/catalog/smartwatch_gestures
+    title: smartwatch_gestures
+  title: Time series
 - section:
   - path: /datasets/catalog/flores
     title: flores
@@ -594,6 +698,12 @@ toc:
 - section:
   - path: /datasets/catalog/gref
     title: gref (manual)
+  - path: /datasets/catalog/grounded_scan
+    title: grounded_scan
   - path: /datasets/catalog/ref_coco
     title: ref_coco (manual)
+  - path: /datasets/catalog/wit
+    title: wit
+  - path: /datasets/catalog/wit_kaggle
+    title: wit_kaggle (manual)
   title: Vision language

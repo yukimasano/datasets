@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ from tensorflow_datasets.core import dataset_builder
 from tensorflow_datasets.core import decode
 from tensorflow_datasets.core import features as features_lib
 from tensorflow_datasets.core import read_only_builder
-from tensorflow_datasets.core import tfrecords_reader
+from tensorflow_datasets.core import reader as reader_lib
 from tensorflow_datasets.testing import test_utils
 
 
@@ -56,6 +56,8 @@ class MockPolicy(enum.Enum):
 @contextlib.contextmanager
 def mock_data(
     num_examples: int = 1,
+    num_sub_examples: int = 1,
+    max_value: Optional[int] = None,
     *,
     policy: MockPolicy = MockPolicy.AUTO,
     as_dataset_fn: Optional[Callable[..., tf.data.Dataset]] = None,
@@ -123,10 +125,14 @@ def mock_data(
   this functions, please open a new issue on our Github.
 
   Args:
-    num_examples: number of fake example to generate.
+    num_examples: Number of fake example to generate.
+    num_sub_examples: Number of examples to generate in nested Dataset features.
+    max_value: The maximum value present in generated tensors; if max_value is
+      None or it is set to 0, then random numbers are generated from the range
+      from 0 to 255.
     policy: Strategy to use to generate the fake examples. See
       `tfds.testing.MockPolicy`.
-    as_dataset_fn: if provided, will replace the default random example
+    as_dataset_fn: If provided, will replace the default random example
       generator. This function mock the `FileAdapterBuilder._as_dataset`
     data_dir: Folder containing the metadata file (searched in
       `data_dir/dataset_name/version`). Overwrite `data_dir` kwargs from
@@ -174,7 +180,6 @@ def mock_data(
 
   def mock_as_dataset(self, split, decoders=None, read_config=None, **kwargs):
     """Function which overwrite `builder._as_dataset`."""
-    del split
     del kwargs
 
     # Partial decoding
@@ -204,7 +209,13 @@ def mock_data(
         # `from_generator` takes a callable with signature () -> iterable
         # Recreating a new generator each time ensure that all pipelines are
         # using the same examples
-        lambda: generator_cls(features=features, num_examples=num_examples),
+        # pylint: disable=g-long-lambda]
+        lambda: generator_cls(
+            features=features,
+            num_examples=num_examples,
+            num_sub_examples=num_sub_examples,
+            max_value=max_value),
+        # pylint: enable=g-long-lambda]
         output_types=tf.nest.map_structure(lambda t: t.dtype, specs),
         output_shapes=tf.nest.map_structure(lambda t: t.shape, specs),
     )
@@ -212,8 +223,8 @@ def mock_data(
     ds = ds.map(decode_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     if read_config and read_config.add_tfds_id:
-      ds_id = tfrecords_reader._make_id_dataset(  # pylint: disable=protected-access
-          filename=f'{self.name}-split.tfrecord-00000-of-00001',
+      ds_id = reader_lib._make_id_dataset(  # pylint: disable=protected-access
+          filename=f'{self.name}-{split}.tfrecord-00000-of-00001',
           start_index=0,  # pytype: disable=wrong-arg-types
       )
       ds = tf.data.Dataset.zip((ds, ds_id))
@@ -281,11 +292,18 @@ def mock_data(
 class RandomFakeGenerator(object):
   """Generator of fake examples randomly and deterministically generated."""
 
-  def __init__(self, features, num_examples, seed=0):
+  def __init__(self,
+               features,
+               num_examples: int,
+               num_sub_examples: int = 1,
+               max_value: Optional[int] = None,
+               seed: int = 0):
     self._rgn = np.random.RandomState(seed)  # Could use the split name as seed
     self._py_rng = random.Random(seed)
     self._features = features
     self._num_examples = num_examples
+    self._num_sub_examples = num_sub_examples
+    self._max_value = max_value
 
   def _generate_random_string_array(self, shape):
     """Generates an array of random strings."""
@@ -310,10 +328,12 @@ class RandomFakeGenerator(object):
 
     # First we deal with the case of sub-datasets:
     if isinstance(feature, features_lib.Dataset):
-      # In sub-datasets we set number of examples to 1. An alternative
-      # solution with setting num_examples to N = self._num_examples would
-      # imply generating O(N*N) examples for nesting of depth 2.
-      generator = RandomFakeGenerator(feature.feature, num_examples=1)
+      # For sub-datasets self._num_sub_examples examples are generated.
+      generator = RandomFakeGenerator(
+          feature.feature,
+          num_examples=self._num_sub_examples,
+          num_sub_examples=1,
+          max_value=self._max_value)
       # Returns the list of examples in the nested dataset.
       return list(generator)
 
@@ -324,6 +344,8 @@ class RandomFakeGenerator(object):
       max_value = feature.num_classes
     elif isinstance(feature, features_lib.Text) and feature.vocab_size:
       max_value = feature.vocab_size
+    elif self._max_value:
+      max_value = self._max_value
     else:
       max_value = 255
 

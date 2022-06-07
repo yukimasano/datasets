@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ paragraph and the infobox tokenized.
 The dataset follows a standarized table format.
 """
 
-_URL = 'https://drive.google.com/uc?export=download&id=1L7aoUXzHPzyzQ0ns4ApBbYepsjFOtXil'
+_URL = 'https://huggingface.co/datasets/wiki_bio/resolve/main/data/wikipedia-biography-dataset.zip'
 
 
 def _get_table(infobox_line):
@@ -102,8 +102,12 @@ class WikiBio(tfds.core.GeneratorBasedBuilder):
 
   def _split_generators(self, dl_manager):
     """Returns SplitGenerators."""
-    extracted_path = os.path.join(
-        dl_manager.download_and_extract(_URL), 'wikipedia-biography-dataset')
+    dataset_url = tfds.download.Resource(
+        url=_URL, extract_method=tfds.download.ExtractMethod.ZIP)
+    data_dir = dl_manager.download_and_extract(dataset_url)
+
+    extracted_path = os.path.join(data_dir, 'wikipedia-biography-dataset')
+
     return [
         tfds.core.SplitGenerator(
             name=tfds.Split.TRAIN,

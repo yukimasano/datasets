@@ -43,7 +43,7 @@ via https://waymo.com/open/licensing/
     ([documentation](https://www.tensorflow.org/datasets/performances#auto-caching)):
     No
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
@@ -89,6 +89,40 @@ FeaturesDict({
 })
 ```
 
+*   **Feature documentation**:
+
+Feature                        | Class        | Shape           | Dtype      | Description
+:----------------------------- | :----------- | :-------------- | :--------- | :----------
+                               | FeaturesDict |                 |            |
+camera_FRONT                   | FeaturesDict |                 |            |
+camera_FRONT/image             | Image        | (1280, 1920, 3) | tf.uint8   |
+camera_FRONT/labels            | Sequence     |                 |            |
+camera_FRONT/labels/bbox       | BBoxFeature  | (4,)            | tf.float32 |
+camera_FRONT/labels/type       | ClassLabel   |                 | tf.int64   |
+camera_FRONT_LEFT              | FeaturesDict |                 |            |
+camera_FRONT_LEFT/image        | Image        | (1280, 1920, 3) | tf.uint8   |
+camera_FRONT_LEFT/labels       | Sequence     |                 |            |
+camera_FRONT_LEFT/labels/bbox  | BBoxFeature  | (4,)            | tf.float32 |
+camera_FRONT_LEFT/labels/type  | ClassLabel   |                 | tf.int64   |
+camera_FRONT_RIGHT             | FeaturesDict |                 |            |
+camera_FRONT_RIGHT/image       | Image        | (1280, 1920, 3) | tf.uint8   |
+camera_FRONT_RIGHT/labels      | Sequence     |                 |            |
+camera_FRONT_RIGHT/labels/bbox | BBoxFeature  | (4,)            | tf.float32 |
+camera_FRONT_RIGHT/labels/type | ClassLabel   |                 | tf.int64   |
+camera_SIDE_LEFT               | FeaturesDict |                 |            |
+camera_SIDE_LEFT/image         | Image        | (886, 1920, 3)  | tf.uint8   |
+camera_SIDE_LEFT/labels        | Sequence     |                 |            |
+camera_SIDE_LEFT/labels/bbox   | BBoxFeature  | (4,)            | tf.float32 |
+camera_SIDE_LEFT/labels/type   | ClassLabel   |                 | tf.int64   |
+camera_SIDE_RIGHT              | FeaturesDict |                 |            |
+camera_SIDE_RIGHT/image        | Image        | (886, 1920, 3)  | tf.uint8   |
+camera_SIDE_RIGHT/labels       | Sequence     |                 |            |
+camera_SIDE_RIGHT/labels/bbox  | BBoxFeature  | (4,)            | tf.float32 |
+camera_SIDE_RIGHT/labels/type  | ClassLabel   |                 | tf.int64   |
+context                        | FeaturesDict |                 |            |
+context/name                   | Text         |                 | tf.string  |
+timestamp_micros               | Tensor       |                 | tf.int64   |
+
 *   **Supervised keys** (See
     [`as_supervised` doc](https://www.tensorflow.org/datasets/api_docs/python/tfds/load#args)):
     `None`
@@ -96,6 +130,10 @@ FeaturesDict({
 *   **Figure**
     ([tfds.show_examples](https://www.tensorflow.org/datasets/api_docs/python/tfds/visualization/show_examples)):
     Not supported.
+
+*   **Examples**
+    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
+    Missing.
 
 *   **Citation**:
 
@@ -108,6 +146,7 @@ month = {June},
 year = {2020}
 }
 ```
+
 
 ## waymo_open_dataset/v1.2 (default config)
 
@@ -122,40 +161,6 @@ Split          | Examples
 `'train'`      | 158,081
 `'validation'` | 39,987
 
-*   **Examples**
-    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
-
-<!-- mdformat off(HTML should not be auto-formatted) -->
-
-{% framebox %}
-
-<button id="displaydataframe">Display examples...</button>
-<div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
-<script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/waymo_open_dataset-v1.2-0.2.0.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
-
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
-        'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
-});
-</script>
-
-{% endframebox %}
-
-<!-- mdformat on -->
-
 ## waymo_open_dataset/v1.1
 
 *   **Config description**: Waymo Open Dataset v1.1
@@ -168,40 +173,6 @@ Split          | Examples
 :------------- | -------:
 `'train'`      | 158,081
 `'validation'` | 39,987
-
-*   **Examples**
-    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
-
-<!-- mdformat off(HTML should not be auto-formatted) -->
-
-{% framebox %}
-
-<button id="displaydataframe">Display examples...</button>
-<div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
-<script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/waymo_open_dataset-v1.1-0.2.0.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
-
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
-        'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
-});
-</script>
-
-{% endframebox %}
-
-<!-- mdformat on -->
 
 ## waymo_open_dataset/v1.0
 
@@ -221,37 +192,3 @@ Split          | Examples
 :------------- | -------:
 `'train'`      | 14,884
 `'validation'` | 4,954
-
-*   **Examples**
-    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
-
-<!-- mdformat off(HTML should not be auto-formatted) -->
-
-{% framebox %}
-
-<button id="displaydataframe">Display examples...</button>
-<div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
-<script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/waymo_open_dataset-v1.0-0.2.0.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
-
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
-        'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
-});
-</script>
-
-{% endframebox %}
-
-<!-- mdformat on -->

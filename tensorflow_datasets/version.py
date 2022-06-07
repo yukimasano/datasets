@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,9 +22,9 @@ This file is replaced by `version_stable.py` for stable releases
 (`tensorflow-datasets`) on PyPI.
 """
 
-# We follow Semantic Versioning (https://semver.org/)
+# We follow Semantic Versioning (https://semver.org/spec/v2.0.0.html)
 _MAJOR_VERSION = '4'
-_MINOR_VERSION = '4'
+_MINOR_VERSION = '6'
 _PATCH_VERSION = '0'
 
 __version__ = '.'.join([

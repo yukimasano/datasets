@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,9 +30,11 @@ import sys
 import textwrap
 import threading
 import typing
-from typing import Any, Callable, Iterable, Iterator, List, NoReturn, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, Callable, Dict, Iterable, Iterator, List, NoReturn, Optional, Tuple, Type, TypeVar, Union
 import uuid
 
+from absl import logging as absl_logging
+from etils import epath
 from six.moves import urllib
 import tensorflow as tf
 from tensorflow_datasets.core import constants
@@ -48,11 +50,12 @@ Tree = type_utils.Tree
 memoize = functools.lru_cache
 
 T = TypeVar('T')
+U = TypeVar('U')
 
 Fn = TypeVar('Fn', bound=Callable[..., Any])
 
 
-def is_notebook():
+def is_notebook() -> bool:
   """Returns True if running in a notebook (Colab, Jupyter) environment."""
   # Inspired from the tqdm autonotebook code
   try:
@@ -64,6 +67,26 @@ def is_notebook():
     return False
   else:
     return True
+
+
+# TODO(tfds): Should likely have a `logging_utils` wrapper around `absl.logging`
+# so logging messages are displayed on Colab.
+
+
+def print_notebook(*args: Any) -> None:
+  """Like `print`/`logging.info`. Colab do not print stderr by default."""
+  msg = ' '.join([str(x) for x in args])
+  if is_notebook():
+    print(msg)
+  else:
+    absl_logging.info(msg)
+
+
+def warning(text: str) -> None:
+  if is_notebook():
+    print(text)
+  else:
+    absl_logging.warning(text)
 
 
 @contextlib.contextmanager
@@ -96,12 +119,11 @@ def disable_logging():
     logger.disabled = logger_disabled
 
 
-class NonMutableDict(dict):
+class NonMutableDict(Dict[T, U]):
   """Dict where keys can only be added but not modified.
 
-  Will raise an error if the user try to overwrite one key. The error message
-  can be customized during construction. It will be formatted using {key} for
-  the overwritten key.
+  Raises an error if a key is overwritten. The error message can be customized
+  during construction. It will be formatted using {key} for the overwritten key.
   """
 
   def __init__(self, *args, **kwargs):
@@ -114,12 +136,12 @@ class NonMutableDict(dict):
     super(NonMutableDict, self).__init__(*args, **kwargs)
 
   def __setitem__(self, key, value):
-    if key in self:
+    if key in self.keys():
       raise ValueError(self._error_msg.format(key=key))
     return super(NonMutableDict, self).__setitem__(key, value)
 
   def update(self, other):
-    if any(k in self for k in other):
+    if any(k in self.keys() for k in other):
       raise ValueError(self._error_msg.format(key=set(self) & set(other)))
     return super(NonMutableDict, self).update(other)
 
@@ -149,7 +171,7 @@ class memoized_property(property):  # pylint: disable=invalid-name
 
 
 if typing.TYPE_CHECKING:
-  # TODO(b/171883689): There is likelly better way to annotate descriptors
+  # TODO(b/171883689): There is likely a better way to annotate descriptors
 
   def classproperty(fn: Callable[[Type[Any]], T]) -> T:  # pylint: disable=function-redefined
     return fn(type(None))
@@ -202,15 +224,14 @@ def zip_nested(arg0, *args, **kwargs):
   return (arg0,) + args
 
 
-def flatten_nest_dict(d):
+def flatten_nest_dict(d: type_utils.TreeDict[T]) -> Dict[str, T]:
   """Return the dict with all nested keys flattened joined with '/'."""
   # Use NonMutableDict to ensure there is no collision between features keys
   flat_dict = NonMutableDict()
   for k, v in d.items():
     if isinstance(v, dict):
-      flat_dict.update({
-          '{}/{}'.format(k, k2): v2 for k2, v2 in flatten_nest_dict(v).items()
-      })
+      flat_dict.update(
+          {f'{k}/{k2}': v2 for k2, v2 in flatten_nest_dict(v).items()})
     else:
       flat_dict[k] = v
   return flat_dict
@@ -269,7 +290,7 @@ def pack_as_nest_dict(flat_d, nest_d):
       sub_d = {
           k2: flat_d.pop('{}/{}'.format(k, k2)) for k2, _ in v_flat.items()
       }
-      # Recursivelly pack the dictionary
+      # Recursively pack the dictionary
       nest_out_d[k] = pack_as_nest_dict(sub_d, v)
     else:
       nest_out_d[k] = flat_d.pop(k)
@@ -294,7 +315,7 @@ def _get_incomplete_path(filename):
 
 
 @contextlib.contextmanager
-def incomplete_dir(dirname: type_utils.PathLike) -> Iterator[str]:
+def incomplete_dir(dirname: epath.PathLike) -> Iterator[str]:
   """Create temporary dir for dirname and rename on exit."""
   dirname = os.fspath(dirname)
   tmp_dir = _get_incomplete_path(dirname)
@@ -308,8 +329,7 @@ def incomplete_dir(dirname: type_utils.PathLike) -> Iterator[str]:
 
 
 @contextlib.contextmanager
-def incomplete_file(
-    path: type_utils.ReadWritePath,) -> Iterator[type_utils.ReadWritePath]:
+def incomplete_file(path: epath.Path,) -> Iterator[epath.Path]:
   """Writes to path atomically, by writing to temp file and renaming it."""
   tmp_path = path.parent / f'{path.name}.incomplete.{uuid.uuid4().hex}'
   try:
@@ -471,7 +491,7 @@ def basename_from_url(url: str) -> str:
   return filename or 'unknown_name'
 
 
-def list_info_files(dir_path: type_utils.PathLike) -> List[str]:
+def list_info_files(dir_path: epath.PathLike) -> List[str]:
   """Returns name of info files within dir_path."""
   from tensorflow_datasets.core import file_adapters  # pylint: disable=g-import-not-at-top  # pytype: disable=import-error
   path = os.fspath(dir_path)
@@ -494,7 +514,7 @@ def get_base64(write_fn: Union[bytes, Callable[[io.BytesIO], None]],) -> str:
 
 
 @contextlib.contextmanager
-def add_sys_path(path: type_utils.PathLike) -> Iterator[None]:
+def add_sys_path(path: epath.PathLike) -> Iterator[None]:
   """Temporary add given path to `sys.path`."""
   path = os.fspath(path)
   try:

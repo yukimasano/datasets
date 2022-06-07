@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,12 +19,15 @@ import os
 from typing import Optional, Union
 import wave
 
+from etils import epath
 import numpy as np
 import tensorflow as tf
 
 from tensorflow_datasets.core import lazy_imports_lib
 from tensorflow_datasets.core import utils
+from tensorflow_datasets.core.features import feature as feature_lib
 from tensorflow_datasets.core.features import tensor_feature
+from tensorflow_datasets.core.proto import feature_pb2
 from tensorflow_datasets.core.utils import type_utils
 
 Json = type_utils.Json
@@ -48,10 +51,11 @@ class Audio(tensor_feature.Tensor):
       self,
       *,
       file_format: Optional[str] = None,
-      shape=(None,),
-      dtype=tf.int64,
-      sample_rate=None,
+      shape: utils.Shape = (None,),
+      dtype: tf.dtypes.DType = tf.int64,
+      sample_rate: Optional[int] = None,
       encoding: Union[str, Encoding] = Encoding.NONE,
+      doc: feature_lib.DocArg = None,
   ):
     """Constructs the connector.
 
@@ -65,6 +69,7 @@ class Audio(tensor_feature.Tensor):
         encoding nor decoding.
       encoding: Internal encoding. See `tfds.features.Encoding` for available
         values.
+      doc: Documentation of this feature (e.g. description).
     """
     self._file_format = file_format
     if len(shape) > 2:
@@ -72,12 +77,12 @@ class Audio(tensor_feature.Tensor):
                        f'(length, num_channels), got {shape}.')
     self._shape = shape
     self._sample_rate = sample_rate
-    super().__init__(shape=shape, dtype=dtype, encoding=encoding)
+    super().__init__(shape=shape, dtype=dtype, encoding=encoding, doc=doc)
 
   def _encode_file(self, fobj, file_format):
     audio_segment = lazy_imports_lib.lazy_imports.pydub.AudioSegment.from_file(
         fobj, format=file_format)
-    np_dtype = np.dtype(self.dtype.as_numpy_dtype)
+    np_dtype = np.dtype(self.numpy_dtype)
     raw_samples = np.array(audio_segment.get_array_of_samples())
     raw_samples = raw_samples.astype(np_dtype)
     if audio_segment.channels > 1:
@@ -89,7 +94,7 @@ class Audio(tensor_feature.Tensor):
   def encode_example(self, audio_or_path_or_fobj):
     if isinstance(audio_or_path_or_fobj, (np.ndarray, list)):
       return audio_or_path_or_fobj
-    elif isinstance(audio_or_path_or_fobj, type_utils.PathLikeCls):
+    elif isinstance(audio_or_path_or_fobj, epath.PathLikeCls):
       filename = os.fspath(audio_or_path_or_fobj)
       file_format = self._file_format or filename.split('.')[-1]
       with tf.io.gfile.GFile(filename, 'rb') as audio_f:
@@ -123,21 +128,31 @@ class Audio(tensor_feature.Tensor):
             ' controlsList="nodownload" />')
 
   @classmethod
-  def from_json_content(cls, value: Json) -> 'Audio':
+  def from_json_content(
+      cls, value: Union[Json, feature_pb2.AudioFeature]) -> 'Audio':
+    if isinstance(value, dict):
+      # For backwards compatibility
+      return cls(
+          file_format=value['file_format'],
+          shape=tuple(value['shape']),
+          dtype=tf.dtypes.as_dtype(value['dtype']),
+          sample_rate=value['sample_rate'],
+      )
     return cls(
-        file_format=value['file_format'],
-        shape=tuple(value['shape']),
-        dtype=tf.dtypes.as_dtype(value['dtype']),
-        sample_rate=value['sample_rate'],
-    )
+        shape=feature_lib.from_shape_proto(value.shape),
+        dtype=feature_lib.parse_dtype(value.dtype),
+        file_format=value.file_format or None,
+        sample_rate=value.sample_rate,
+        encoding=value.encoding)
 
-  def to_json_content(self) -> Json:
-    return {
-        'file_format': self._file_format,
-        'shape': list(self._shape),
-        'dtype': self._dtype.name,
-        'sample_rate': self._sample_rate,
-    }
+  def to_json_content(self) -> feature_pb2.AudioFeature:
+    return feature_pb2.AudioFeature(
+        shape=feature_lib.to_shape_proto(self.shape),
+        dtype=feature_lib.encode_dtype(self.dtype),
+        file_format=self._file_format,
+        sample_rate=self._sample_rate,
+        encoding=self._encoding.name,
+    )
 
 
 def _save_wav(buff, data, rate) -> None:

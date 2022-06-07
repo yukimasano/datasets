@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -82,6 +82,33 @@ class FeatureDictTest(testing.FeatureExpectationsTestCase):
 
     t = features_lib.TensorInfo(shape=(None, 3), dtype=tf.string)
     self.assertEqual(t, features_lib.TensorInfo.copy_from(t))
+
+  def test_tensor_spec(self):
+    feature = features_lib.FeaturesDict({
+        'input': AnInputConnector(),
+        'output': AnOutputConnector(),
+        'img': {
+            'size': {
+                'height': features_lib.Tensor(shape=(2, 3), dtype=tf.int64),
+                'width': features_lib.Tensor(shape=[None, 3], dtype=tf.int64),
+            },
+            'image': features_lib.Image(shape=(28, 28, 1)),
+            'metadata/path': tf.string,
+        }
+    })
+    self.assertAllEqualNested(
+        feature.get_tensor_spec(), {
+            'input': tf.TensorSpec(shape=[], dtype=tf.int64),
+            'output': tf.TensorSpec(shape=[], dtype=tf.float32),
+            'img': {
+                'size': {
+                    'height': tf.TensorSpec(shape=[2, 3], dtype=tf.int64),
+                    'width': tf.TensorSpec(shape=[None, 3], dtype=tf.int64),
+                },
+                'image': tf.TensorSpec(shape=[28, 28, 1], dtype=tf.uint8),
+                'metadata/path': tf.TensorSpec(shape=[], dtype=tf.string),
+            }
+        })
 
   def test_fdict(self):
 
@@ -293,6 +320,31 @@ def test_tensor_feature_backward_compatibility():
   # Both aliases are registered
   assert registered[module_base + 'tensor_feature.Tensor'] is cls
   assert registered[module_base + 'feature.Tensor'] is cls
+
+
+def test_from_json_content_backward_compatibility():
+  legacy_json = {
+      'type': 'tensorflow_datasets.core.features.features_dict.FeaturesDict',
+      'content': {
+          'input': {
+              'type': 'tensorflow_datasets.core.features.image_feature.Image',
+              'content': {
+                  'shape': [28, 28, 3],
+                  'dtype': 'uint8',
+                  'encoding_format': 'png'
+              }
+          },
+          'target': {
+              'type':
+                  'tensorflow_datasets.core.features.class_label_feature.ClassLabel',
+              'content': {
+                  'num_classes': 10
+              }
+          }
+      }
+  }
+  parsed_features_dict = features_lib.FeatureConnector.from_json(legacy_json)
+  assert parsed_features_dict.keys() == set(['input', 'target'])
 
 
 if __name__ == '__main__':

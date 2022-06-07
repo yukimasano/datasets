@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ publicly released. We provide support for the test split from 2012 with the
 minor patch released on October 10, 2019. In order to manually download this
 data, a user must perform the following operations:
 
-1. Download the 2012 test split available [here](http://www.image-net.org/challenges/LSVRC/2012/downloads.php#images).
+1. Download the 2012 test split available [here](https://image-net.org/challenges/LSVRC/2012/2012-downloads.php#Images).
 2. Download the October 10, 2019 patch. There is a Google Drive link to the
 patch provided on the same page.
 3. Combine the two tar-balls, manually overwriting any images in the original
@@ -72,7 +72,7 @@ A sample of an exported text file looks like the following:
 
 The export format is described in full in "readme.txt" within the 2013
 development kit available here:
-http://imagenet.stanford.edu/image/ilsvrc2013/ILSVRC2013_devkit.tgz
+https://image-net.org/data/ILSVRC/2013/ILSVRC2013_devkit.tgz
 Please see the section entitled "3.3 CLS-LOC submission format". Briefly, the
 format of the text file is 100,000 lines corresponding to each image in the test
 split. Each line of integers correspond to the rank-ordered, top 5 predictions
@@ -81,7 +81,7 @@ in the corresponding labels file. See imagenet2012_labels.txt.
 """
 
 # Web-site is asking to cite paper from 2015.
-# http://www.image-net.org/challenges/LSVRC/2012/index#cite
+# https://image-net.org/challenges/LSVRC/2012/index#cite
 _CITATION = """\
 @article{ILSVRC15,
 Author = {Olga Russakovsky and Jia Deng and Hao Su and Jonathan Krause and Sanjeev Satheesh and Sean Ma and Zhiheng Huang and Andrej Karpathy and Aditya Khosla and Michael Bernstein and Alexander C. Berg and Li Fei-Fei},
@@ -131,6 +131,46 @@ CMYK_IMAGES = [
 PNG_IMAGES = ['n02105855_2933.JPEG']
 
 
+def get_validation_labels(val_path):
+  """Returns labels for validation.
+
+  Args:
+    val_path: path to TAR file containing validation images. It is used to
+      retrieve the name of pictures and associate them to labels.
+
+  Returns:
+    dict, mapping from image name (str) to label (str).
+  """
+  labels_path = tfds.core.tfds_path(_VALIDATION_LABELS_FNAME)
+  with tf.io.gfile.GFile(os.fspath(labels_path)) as labels_f:
+    # `splitlines` to remove trailing `\r` in Windows
+    labels = labels_f.read().strip().splitlines()
+  with tf.io.gfile.GFile(val_path, 'rb') as tar_f_obj:
+    tar = tarfile.open(mode='r:', fileobj=tar_f_obj)
+    images = sorted(tar.getnames())
+  return dict(zip(images, labels))
+
+
+def generate_examples_validation(archive, labels):
+  for fname, fobj in archive:
+    record = {
+        'file_name': fname,
+        'image': fobj,
+        'label': labels[fname],
+    }
+    yield fname, record
+
+
+def generate_examples_test(archive):
+  for fname, fobj in archive:
+    record = {
+        'file_name': fname,
+        'image': fobj,
+        'label': -1,
+    }
+    yield fname, record
+
+
 class Imagenet2012(tfds.core.GeneratorBasedBuilder):
   """Imagenet 2012, aka ILSVRC 2012."""
 
@@ -160,7 +200,7 @@ class Imagenet2012(tfds.core.GeneratorBasedBuilder):
   MANUAL_DOWNLOAD_INSTRUCTIONS = """\
   manual_dir should contain two files: ILSVRC2012_img_train.tar and
   ILSVRC2012_img_val.tar.
-  You need to register on http://www.image-net.org/download-images in order
+  You need to register on https://image-net.org/download-images in order
   to get the link to download the dataset.
   """
 
@@ -175,29 +215,9 @@ class Imagenet2012(tfds.core.GeneratorBasedBuilder):
             'file_name': tfds.features.Text(),  # Eg: 'n15075141_54.JPEG'
         }),
         supervised_keys=('image', 'label'),
-        homepage='http://image-net.org/',
+        homepage='https://image-net.org/',
         citation=_CITATION,
     )
-
-  @staticmethod
-  def _get_validation_labels(val_path):
-    """Returns labels for validation.
-
-    Args:
-      val_path: path to TAR file containing validation images. It is used to
-        retrieve the name of pictures and associate them to labels.
-
-    Returns:
-      dict, mapping from image name (str) to label (str).
-    """
-    labels_path = tfds.core.tfds_path(_VALIDATION_LABELS_FNAME)
-    with tf.io.gfile.GFile(os.fspath(labels_path)) as labels_f:
-      # `splitlines` to remove trailing `\r` in Windows
-      labels = labels_f.read().strip().splitlines()
-    with tf.io.gfile.GFile(val_path, 'rb') as tar_f_obj:
-      tar = tarfile.open(mode='r:', fileobj=tar_f_obj)
-      images = sorted(tar.getnames())
-    return dict(zip(images, labels))
 
   def _split_generators(self, dl_manager):
     train_path = os.path.join(dl_manager.manual_dir, 'ILSVRC2012_img_train.tar')
@@ -215,7 +235,7 @@ class Imagenet2012(tfds.core.GeneratorBasedBuilder):
         split=tfds.Split.VALIDATION,
         split_path=val_path,
         dl_manager=dl_manager,
-        validation_labels=self._get_validation_labels(val_path),
+        validation_labels=get_validation_labels(val_path),
     )
     _add_split_if_exists(
         split_list=splits,
@@ -250,11 +270,11 @@ class Imagenet2012(tfds.core.GeneratorBasedBuilder):
                          labels_exist=True):
     """Yields examples."""
     if not labels_exist:  # Test split
-      for key, example in self._generate_examples_test(archive):
+      for key, example in generate_examples_test(archive):
         yield key, example
     if validation_labels:  # Validation split
-      for key, example in self._generate_examples_validation(
-          archive, validation_labels):
+      for key, example in generate_examples_validation(archive,
+                                                       validation_labels):
         yield key, example
     # Training split. Main archive contains archives names after a synset noun.
     # Each sub-archive contains pictures associated to that synset.
@@ -273,24 +293,6 @@ class Imagenet2012(tfds.core.GeneratorBasedBuilder):
             'label': label,
         }
         yield image_fname, record
-
-  def _generate_examples_validation(self, archive, labels):
-    for fname, fobj in archive:
-      record = {
-          'file_name': fname,
-          'image': fobj,
-          'label': labels[fname],
-      }
-      yield fname, record
-
-  def _generate_examples_test(self, archive):
-    for fname, fobj in archive:
-      record = {
-          'file_name': fname,
-          'image': fobj,
-          'label': -1,
-      }
-      yield fname, record
 
 
 def _add_split_if_exists(split_list, split, split_path, dl_manager, **kwargs):

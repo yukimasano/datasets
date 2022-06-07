@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,13 +31,15 @@ processed the dataset as well:
 """
 
 import abc
+import dataclasses
 import json
 import os
 import posixpath
 import tempfile
-from typing import Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 from absl import logging
+from etils import epath
 import six
 import tensorflow as tf
 
@@ -50,7 +52,6 @@ from tensorflow_datasets.core.features import feature as feature_lib
 from tensorflow_datasets.core.features import top_level_feature
 from tensorflow_datasets.core.proto import dataset_info_pb2
 from tensorflow_datasets.core.utils import gcs_utils
-from tensorflow_datasets.core.utils import type_utils
 
 from google.protobuf import json_format
 
@@ -64,40 +65,124 @@ LICENSE_FILENAME = "LICENSE"
 METADATA_FILENAME = "metadata.json"
 
 
+def dataset_info_path(dataset_info_dir: epath.PathLike) -> str:
+  return os.path.join(os.fspath(dataset_info_dir), DATASET_INFO_FILENAME)
+
+
+def license_path(dataset_info_dir: epath.PathLike) -> str:
+  return os.path.join(os.fspath(dataset_info_dir), LICENSE_FILENAME)
+
+
+@six.add_metaclass(abc.ABCMeta)
+class Metadata(dict):
+  """Abstract base class for DatasetInfo metadata container.
+
+  `builder.info.metadata` allows the dataset to expose additional general
+  information about the dataset which are not specific to a feature or
+  individual example.
+
+  To implement the interface, overwrite `save_metadata` and
+  `load_metadata`.
+
+  See `tfds.core.MetadataDict` for a simple implementation that acts as a
+  dict that saves data to/from a JSON file.
+  """
+
+  @abc.abstractmethod
+  def save_metadata(self, data_dir):
+    """Save the metadata."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def load_metadata(self, data_dir):
+    """Restore the metadata."""
+    raise NotImplementedError()
+
+
+@dataclasses.dataclass()
+class DatasetIdentity:
+  """Identity of a dataset that completely identifies a dataset."""
+  name: str
+  version: utils.Version
+  data_dir: str
+  module_name: str
+  config_name: Optional[str] = None
+  config_description: Optional[str] = None
+  release_notes: Optional[Dict[str, str]] = None
+
+  @classmethod
+  def from_builder(cls, builder) -> "DatasetIdentity":
+    if builder.builder_config:
+      config_name = builder.builder_config.name
+      config_description = builder.builder_config.description
+    else:
+      config_name = None
+      config_description = None
+    return cls(
+        name=builder.name,
+        version=utils.Version(builder.version),
+        data_dir=builder.data_dir,
+        module_name=str(builder.__module__),
+        config_name=config_name,
+        config_description=config_description,
+        release_notes=builder.release_notes,
+    )
+
+  @classmethod
+  def from_proto(
+      cls,
+      info_proto: dataset_info_pb2.DatasetInfo,
+      data_dir: str,
+  ) -> "DatasetIdentity":
+    return cls(
+        name=info_proto.name,
+        version=utils.Version(info_proto.version),
+        data_dir=data_dir,
+        module_name=info_proto.module_name,
+        config_name=info_proto.config_name,
+        config_description=info_proto.config_description,
+        release_notes={k: v for k, v in info_proto.release_notes.items()},
+    )
+
+
 class DatasetInfo(object):
   """Information about a dataset.
 
   `DatasetInfo` documents datasets, including its name, version, and features.
   See the constructor arguments and properties for a full list.
 
-  Note: Not all fields are known on construction and may be updated later
-  by `compute_dynamic_properties`. For example: the min and max values of a
-  feature is typically updated during data generation (i.e. on calling
-  builder.download_and_prepare()`).
+  Note: Not all fields are known if the dataset hasn't been generated yet
+  (before the first `builder.download_and_prepare()` call). For example splits
+  names or number of examples might be missing (as they are computed
+  at dataset creation time).
+
   """
 
   def __init__(
       self,
       *,
-      builder,
-      description=None,
-      features=None,
+      builder: Union[DatasetIdentity, Any],
+      description: Optional[str] = None,
+      features: Optional[feature_lib.FeatureConnector] = None,
       supervised_keys: Optional[SupervisedKeysType] = None,
       disable_shuffling: bool = False,
-      homepage=None,
-      citation=None,
-      metadata=None,
+      homepage: Optional[str] = None,
+      citation: Optional[str] = None,
+      metadata: Optional[Metadata] = None,
       license: Optional[str] = None,  # pylint: disable=redefined-builtin
-      redistribution_info=None):
+      redistribution_info: Optional[Dict[str, str]] = None,
+      split_dict: Optional[splits_lib.SplitDict] = None):
+    # pyformat: disable
     """Constructs DatasetInfo.
 
     Args:
-      builder: `DatasetBuilder`, dataset builder for this info.
+      builder: `DatasetBuilder` or `DatasetIdentity`. The dataset builder or
+        identity will be used to populate this info.
       description: `str`, description of this dataset.
       features: `tfds.features.FeaturesDict`, Information on the feature dict of
         the `tf.data.Dataset()` object from the `builder.as_dataset()` method.
-      supervised_keys: Specifies the input structure for supervised learning,
-        if applicable for the dataset, used with "as_supervised". The keys
+      supervised_keys: Specifies the input structure for supervised learning, if
+        applicable for the dataset, used with "as_supervised". The keys
         correspond to the feature names to select in `info.features`. When
         calling `tfds.core.DatasetBuilder.as_dataset()` with
         `as_supervised=True`, the `tf.data.Dataset` object will yield the
@@ -115,7 +200,7 @@ class DatasetInfo(object):
         yielding a tuple with a dictionary of features in the `features`
         position.
 
-        Note that Selecting features in nested `tfds.features.FeaturesDict`
+        Note that selecting features in nested `tfds.features.FeaturesDict`
         objects is not supported.
       disable_shuffling: `bool`, specify whether to shuffle the examples.
       homepage: `str`, optional, the homepage for this dataset.
@@ -123,30 +208,30 @@ class DatasetInfo(object):
       metadata: `tfds.core.Metadata`, additonal object which will be
         stored/restored with the dataset. This allows for storing additional
         information with the dataset.
-      license: Optional license of the dataset
-      redistribution_info: `dict`, optional, information needed for
-        redistribution, as specified in `dataset_info_pb2.RedistributionInfo`.
-        The content of the `license` subfield will automatically be written to a
-        LICENSE file stored with the dataset.
+      license: license of the dataset.
+      redistribution_info: information needed for redistribution, as specified
+        in `dataset_info_pb2.RedistributionInfo`. The content of the `license`
+        subfield will automatically be written to a LICENSE file stored with the
+        dataset.
+      split_dict: information about the splits in this dataset.
     """
-    self._builder = builder
-
-    if builder.builder_config:
-      config_name = builder.builder_config.name
-      config_description = builder.builder_config.description
+    # pyformat: enable
+    self._builder_or_identity = builder
+    if isinstance(builder, DatasetIdentity):
+      self._identity = builder
     else:
-      config_name = None
-      config_description = None
+      self._identity = DatasetIdentity.from_builder(builder)
 
     self._info_proto = dataset_info_pb2.DatasetInfo(
-        name=builder.name,
+        name=self._identity.name,
         description=utils.dedent(description),
-        version=str(builder.version),
+        version=str(self._identity.version),
+        release_notes=self._identity.release_notes,
         disable_shuffling=disable_shuffling,
-        config_name=config_name,
-        config_description=config_description,
+        config_name=self._identity.config_name,
+        config_description=self._identity.config_description,
         citation=utils.dedent(citation),
-        module_name=str(builder.__module__),
+        module_name=self._identity.module_name,
         redistribution_info=dataset_info_pb2.RedistributionInfo(
             license=utils.dedent(license or redistribution_info.pop("license")),
             **redistribution_info) if redistribution_info else None)
@@ -160,7 +245,9 @@ class DatasetInfo(object):
             "DatasetInfo.features only supports FeaturesDict or Sequence at "
             "the top-level. Got {}".format(features))
     self._features = features
-    self._splits = splits_lib.SplitDict([], dataset_name=self._builder.name)
+    self._splits = splits_lib.SplitDict([])
+    if split_dict:
+      self.set_splits(split_dict)
     if supervised_keys is not None:
       self._info_proto.supervised_keys.CopyFrom(
           _supervised_keys_to_proto(supervised_keys))
@@ -175,19 +262,58 @@ class DatasetInfo(object):
     self._fully_initialized = False
 
   @property
-  def as_proto(self):
+  def _builder(self) -> Any:
+    logging.warning("DEPRECATED: please do not use _builder as this may change")
+    return self._builder_or_identity
+
+  @classmethod
+  def from_proto(cls, builder,
+                 proto: dataset_info_pb2.DatasetInfo) -> "DatasetInfo":
+    """Instantiates DatasetInfo from the given builder and proto."""
+    if builder.builder_config:
+      assert builder.builder_config.name == proto.config_name
+    assert str(builder.version) == proto.version
+    features = None
+    if proto.HasField("features"):
+      features = feature_lib.FeatureConnector.from_proto(proto.features)
+    supervised_keys = None
+    if proto.HasField("supervised_keys"):
+      supervised_keys = _supervised_keys_from_proto(proto.supervised_keys)
+    filename_template = naming.ShardedFileTemplate(
+        dataset_name=builder.name,
+        data_dir=builder.data_dir,
+        filetype_suffix=proto.file_format or "tfrecord")
+    return cls(
+        builder=builder,
+        description=proto.description,
+        features=features,
+        supervised_keys=supervised_keys,
+        disable_shuffling=proto.disable_shuffling,
+        citation=proto.citation,
+        license=proto.redistribution_info.license,
+        split_dict=splits_lib.SplitDict.from_proto(
+            repeated_split_infos=proto.splits,
+            filename_template=filename_template),
+    )
+
+  @property
+  def as_proto(self) -> dataset_info_pb2.DatasetInfo:
     return self._info_proto
 
   @property
-  def name(self):
-    return self.as_proto.name
+  def name(self) -> str:
+    return self._identity.name
+
+  @property
+  def config_name(self) -> str:
+    return self._identity.config_name
 
   @property
   def full_name(self):
     """Full canonical name: (<dataset_name>/<config_name>/<version>)."""
-    names = [self._builder.name]
-    if self._builder.builder_config:
-      names.append(self._builder.builder_config.name)
+    names = [self.name]
+    if self.config_name:
+      names.append(self.config_name)
     names.append(str(self.version))
     return posixpath.join(*names)
 
@@ -197,7 +323,11 @@ class DatasetInfo(object):
 
   @property
   def version(self):
-    return self._builder.version
+    return self._identity.version
+
+  @property
+  def release_notes(self) -> Optional[Dict[str, str]]:
+    return self._identity.release_notes
 
   @property
   def disable_shuffling(self) -> bool:
@@ -210,12 +340,12 @@ class DatasetInfo(object):
     return urls and urls[0] or tfds_homepage
 
   @property
-  def citation(self):
+  def citation(self) -> str:
     return self.as_proto.citation
 
   @property
   def data_dir(self):
-    return self._builder.data_dir
+    return self._identity.data_dir
 
   @property
   def dataset_size(self) -> utils.Size:
@@ -239,11 +369,11 @@ class DatasetInfo(object):
     return self._features
 
   @property
-  def metadata(self):
+  def metadata(self) -> Optional[Metadata]:
     return self._metadata
 
   @property
-  def supervised_keys(self):
+  def supervised_keys(self) -> Optional[SupervisedKeysType]:
     if not self.as_proto.HasField("supervised_keys"):
       return None
     supervised_keys = self.as_proto.supervised_keys
@@ -254,8 +384,8 @@ class DatasetInfo(object):
     return self.as_proto.redistribution_info
 
   @property
-  def module_name(self):
-    return self.as_proto.module_name
+  def module_name(self) -> str:
+    return self._identity.module_name
 
   @property
   def file_format(self) -> Optional[file_adapters.FileFormat]:
@@ -266,6 +396,7 @@ class DatasetInfo(object):
   def set_file_format(
       self,
       file_format: Union[None, str, file_adapters.FileFormat],
+      override: bool = False,
   ) -> None:
     """Internal function to define the file format.
 
@@ -274,73 +405,107 @@ class DatasetInfo(object):
 
     Args:
       file_format: The file format.
+      override: Whether the file format should be overridden if it is already
+        set.
+
+    Raises:
+      ValueError: if the file format was already set and the `override`
+      parameter was False.
+      RuntimeError: if an incorrect combination of options is given, e.g.
+      `override=True` when the DatasetInfo is already fully initialized.
     """
     # If file format isn't present already, fallback to `DEFAULT_FILE_FORMAT`
     file_format = (
         file_format  # Format explicitly given: tfds.builder(..., file_format=x)
         or self.file_format  # Format restored from dataset_info.json
         or file_adapters.DEFAULT_FILE_FORMAT)
-    try:
-      new_file_format = file_adapters.FileFormat(file_format)
-    except ValueError as e:
-      all_values = [f.value for f in file_adapters.FileFormat]
-      utils.reraise(e, suffix=f". Valid file formats: {all_values}")
+    file_format = file_adapters.FileFormat.from_value(file_format)
 
     # If the file format has been set once, file format should be consistent
-    if self.file_format and self.file_format != new_file_format:
+    if (not override and self.file_format and self.file_format != file_format):
       raise ValueError(f"File format is already set to {self.file_format}. "
-                       f"Got {new_file_format}")
-    self.as_proto.file_format = new_file_format.value
+                       f"Got {file_format}")
+    if override and self._fully_initialized:
+      raise RuntimeError("Cannot override the file format "
+                         "when the DatasetInfo is already fully initialized!")
+    self._info_proto.file_format = file_format.value
 
   @property
-  def splits(self):
+  def splits(self) -> splits_lib.SplitDict:
     return self._splits
 
   def set_splits(self, split_dict: splits_lib.SplitDict) -> None:
     """Split setter (private method)."""
-    if self._builder.name != split_dict._dataset_name:  # pylint: disable=protected-access
-      raise AssertionError(
-          "SplitDict dataset_name does not seems to match dataset_info. "  # pylint: disable=protected-access
-          f"{self._builder.name} != {split_dict._dataset_name}")
+    for split, split_info in split_dict.items():
+      if isinstance(split_info, splits_lib.MultiSplitInfo):
+        # When splits are from multiple folders, the dataset can be different.
+        continue
+      if (split_info.filename_template and
+          self.name != split_info.filename_template.dataset_name):
+        raise AssertionError(
+            f"SplitDict contains SplitInfo for split {split} whose "
+            "dataset_name does not match to the dataset name in dataset_info. "
+            f"{self.name} != {split_info.filename_template.dataset_name}")
 
     # If the statistics have been pre-loaded, forward the statistics
-    # into the new split_dict
+    # into the new split_dict. Also add the filename template if it's not set.
     new_split_infos = []
+    incomplete_filename_template = naming.ShardedFileTemplate(
+        dataset_name=self.name,
+        data_dir=self.data_dir,
+        filetype_suffix=(self.as_proto.file_format or
+                         file_adapters.DEFAULT_FILE_FORMAT.value))
     for split_info in split_dict.values():
+      if isinstance(split_info, splits_lib.MultiSplitInfo):
+        new_split_infos.append(split_info)
+        continue
       old_split_info = self._splits.get(split_info.name)
       if (not split_info.statistics.ByteSize() and old_split_info and
           old_split_info.statistics.ByteSize() and
           old_split_info.shard_lengths == split_info.shard_lengths):
         split_info = split_info.replace(statistics=old_split_info.statistics)
+      if not split_info.filename_template:
+        filename_template = incomplete_filename_template.replace(
+            split=split_info.name)
+        split_info = split_info.replace(filename_template=filename_template)
       new_split_infos.append(split_info)
 
     # Update the dictionary representation.
-    self._splits = splits_lib.SplitDict(
-        new_split_infos,
-        dataset_name=self._builder.name,
-    )
+    self._splits = splits_lib.SplitDict(new_split_infos)
 
     # Update the proto
+    # Note that the proto should not be saved or used for multi-folder datasets.
     del self.as_proto.splits[:]  # Clear previous
-    for split_info in split_dict.to_proto():
-      self.as_proto.splits.add().CopyFrom(split_info)
+    for split_info in self._splits.values():
+      if isinstance(split_info, splits_lib.MultiSplitInfo):
+        for si in split_info.split_infos:
+          self.as_proto.splits.add().CopyFrom(si.to_proto())
+      else:
+        self.as_proto.splits.add().CopyFrom(split_info.to_proto())
+
+  def update_data_dir(self, data_dir: str) -> None:
+    """Updates the data dir for each split."""
+    new_split_infos = []
+    for split_info in self._splits.values():
+      if isinstance(split_info, splits_lib.MultiSplitInfo):
+        raise RuntimeError(
+            "Updating the data_dir for MultiSplitInfo is not supported!")
+      filename_template = split_info.filename_template.replace(
+          data_dir=data_dir)
+      new_split_info = split_info.replace(filename_template=filename_template)
+      new_split_infos.append(new_split_info)
+    self.set_splits(splits_lib.SplitDict(new_split_infos))
 
   @property
-  def initialized(self):
+  def initialized(self) -> bool:
     """Whether DatasetInfo has been fully initialized."""
     return self._fully_initialized
 
-  def _dataset_info_path(self, dataset_info_dir):
-    return os.path.join(dataset_info_dir, DATASET_INFO_FILENAME)
-
-  def _license_path(self, dataset_info_dir):
-    return os.path.join(dataset_info_dir, LICENSE_FILENAME)
-
   @property
-  def as_json(self):
+  def as_json(self) -> str:
     return json_format.MessageToJson(self.as_proto, sort_keys=True)
 
-  def write_to_directory(self, dataset_info_dir):
+  def write_to_directory(self, dataset_info_dir: epath.PathLike) -> None:
     """Write `DatasetInfo` as JSON to `dataset_info_dir`."""
     # Save the features structure & metadata (vocabulary, labels,...)
     if self.features:
@@ -351,13 +516,13 @@ class DatasetInfo(object):
       self.metadata.save_metadata(dataset_info_dir)
 
     if self.redistribution_info.license:
-      with tf.io.gfile.GFile(self._license_path(dataset_info_dir), "w") as f:
+      with tf.io.gfile.GFile(license_path(dataset_info_dir), "w") as f:
         f.write(self.redistribution_info.license)
 
-    with tf.io.gfile.GFile(self._dataset_info_path(dataset_info_dir), "w") as f:
+    with tf.io.gfile.GFile(dataset_info_path(dataset_info_dir), "w") as f:
       f.write(self.as_json)
 
-  def read_from_directory(self, dataset_info_dir):
+  def read_from_directory(self, dataset_info_dir: str) -> None:
     """Update DatasetInfo from the JSON files in `dataset_info_dir`.
 
     This function updates all the dynamically generated fields (num_examples,
@@ -374,19 +539,34 @@ class DatasetInfo(object):
     """
     logging.info("Load dataset info from %s", dataset_info_dir)
 
-    json_filename = self._dataset_info_path(dataset_info_dir)
+    json_filename = dataset_info_path(dataset_info_dir)
     if not tf.io.gfile.exists(json_filename):
       raise FileNotFoundError(
-          "Try to load `DatasetInfo` from a directory which does not exist or "
-          "does not contain `dataset_info.json`. Please delete the directory "
+          "Tried to load `DatasetInfo` from a directory which does not exist or"
+          " does not contain `dataset_info.json`. Please delete the directory "
           f"`{dataset_info_dir}`  if you are trying to re-generate the "
           "dataset.")
 
     # Load the metadata from disk
     parsed_proto = read_from_json(json_filename)
 
+    if str(self.version) != parsed_proto.version:
+      raise AssertionError(
+          "The constructed DatasetInfo instance and the restored proto version "
+          "do not match. Builder version: {}. Proto version: {}".format(
+              self.version, parsed_proto.version))
+
+    self._identity = DatasetIdentity.from_proto(
+        info_proto=parsed_proto, data_dir=dataset_info_dir)
+
     # Update splits
-    split_dict = splits_lib.SplitDict.from_proto(self.name, parsed_proto.splits)
+    filename_template = naming.ShardedFileTemplate(
+        dataset_name=self.name,
+        data_dir=self.data_dir,
+        filetype_suffix=parsed_proto.file_format or "tfrecord")
+    split_dict = splits_lib.SplitDict.from_proto(
+        repeated_split_infos=parsed_proto.splits,
+        filename_template=filename_template)
     self.set_splits(split_dict)
 
     # Restore the feature metadata (vocabulary, labels names,...)
@@ -422,12 +602,12 @@ class DatasetInfo(object):
       except ValueError:
         is_defined_in_restored = bool(field_value_restored)
 
-      # If field is defined in code, we ignore the value
+      # If field is defined in code, we ignore the value.
       if is_defined:
         if field_value != field_value_restored:
           logging.info(
-              "Field info.%s from disk and from code do not match. Keeping "
-              "the one from code.", field_name)
+              "Field info.%s from disk and from code do not match. "
+              "Keeping the one from code.", field_name)
         continue
       # If the field is also not defined in JSON file, we do nothing
       if not is_defined_in_restored:
@@ -438,16 +618,10 @@ class DatasetInfo(object):
       else:
         setattr(self._info_proto, field_name, field_value_restored)
 
-    if self._builder._version != self.version:  # pylint: disable=protected-access
-      raise AssertionError(
-          "The constructed DatasetInfo instance and the restored proto version "
-          "do not match. Builder version: {}. Proto version: {}".format(
-              self._builder._version, self.version))  # pylint: disable=protected-access
-
     # Mark as fully initialized.
     self._fully_initialized = True
 
-  def initialize_from_bucket(self):
+  def initialize_from_bucket(self) -> None:
     """Initialize DatasetInfo from GCS bucket info files."""
     # In order to support Colab, we use the HTTP GCS API to access the metadata
     # files. They are copied locally and then loaded.
@@ -458,9 +632,9 @@ class DatasetInfo(object):
     logging.info(
         "Load pre-computed DatasetInfo (eg: splits, num examples,...) "
         "from GCS: %s", self.full_name)
-    for fname in data_files:
-      out_fname = os.path.join(tmp_dir, os.path.basename(fname))
-      tf.io.gfile.copy(os.fspath(gcs_utils.gcs_path(fname)), out_fname)
+    for path in data_files:
+      out_fname = os.path.join(tmp_dir, path.name)
+      tf.io.gfile.copy(os.fspath(path), out_fname)
     self.read_from_directory(tmp_dir)
 
   def __repr__(self):
@@ -477,6 +651,9 @@ class DatasetInfo(object):
     else:
       config_description = SKIP
 
+    file_format_str = (
+        self.file_format.value
+        if self.file_format else file_adapters.DEFAULT_FILE_FORMAT.value)
     lines = ["tfds.core.DatasetInfo("]
     for key, value in [
         ("name", repr(self.name)),
@@ -485,6 +662,7 @@ class DatasetInfo(object):
         ("config_description", config_description),
         ("homepage", repr(self.homepage)),
         ("data_path", repr(self.data_dir)),
+        ("file_format", file_format_str),
         ("download_size", self.download_size),
         ("dataset_size", self.dataset_size),
         ("features", _indent(repr(self.features))),
@@ -556,7 +734,8 @@ def _nest_from_proto(proto: dataset_info_pb2.SupervisedKeys.Nest) -> Nest:
     return tuple(_nest_from_proto(item) for item in proto.tuple.items)
   elif proto.HasField("dict"):
     return {
-        key: _nest_from_proto(value) for key, value in proto.dict.dict.items()
+        key: _nest_from_proto(value)
+        for key, value in sorted(proto.dict.dict.items())
     }
   elif proto.HasField("feature_key"):
     return proto.feature_key
@@ -608,9 +787,12 @@ def get_dataset_feature_statistics(builder, split):
   if filetype_suffix not in ["tfrecord", "csv"]:
     raise ValueError(
         "Cannot generate statistics for filetype {}".format(filetype_suffix))
-  filepattern = naming.filepattern_for_dataset_split(builder.name, split,
-                                                     builder.data_dir,
-                                                     filetype_suffix)
+  filename_template = naming.ShardedFileTemplate(
+      data_dir=builder.data_dir,
+      dataset_name=builder.name,
+      split=split,
+      filetype_suffix=filetype_suffix)
+  filepattern = filename_template.sharded_filepaths_pattern()
   # Avoid generating a large number of buckets in rank histogram
   # (default is 1000).
   stats_options = tfdv.StatsOptions(
@@ -633,12 +815,33 @@ def get_dataset_feature_statistics(builder, split):
   return statistics.datasets[0], schema
 
 
-def read_from_json(path: type_utils.PathLike) -> dataset_info_pb2.DatasetInfo:
+def read_from_json(path: epath.PathLike) -> dataset_info_pb2.DatasetInfo:
   """Read JSON-formatted proto into DatasetInfo proto."""
-  json_str = utils.as_path(path).read_text()
+  json_str = epath.Path(path).read_text()
   # Parse it back into a proto.
   parsed_proto = json_format.Parse(json_str, dataset_info_pb2.DatasetInfo())
   return parsed_proto
+
+
+def read_proto_from_builder_dir(
+    builder_dir: epath.PathLike) -> dataset_info_pb2.DatasetInfo:
+  """Reads the dataset info from the given builder dir.
+
+  Args:
+    builder_dir: The folder that contains the dataset info files.
+
+  Returns:
+    The DatasetInfo proto as read from the builder dir.
+
+  Raises:
+    FileNotFoundError: If the builder_dir does not exist.
+  """
+  info_path = os.path.join(
+      os.path.expanduser(builder_dir), DATASET_INFO_FILENAME)
+  if not tf.io.gfile.exists(info_path):
+    raise FileNotFoundError(
+        f"Could not load dataset info: {info_path} does not exist.")
+  return read_from_json(info_path)
 
 
 def pack_as_supervised_ds(
@@ -653,32 +856,6 @@ def pack_as_supervised_ds(
     return ds
   else:  # If dataset isn't a supervised tuple (input, label), return as-is
     return ds
-
-
-@six.add_metaclass(abc.ABCMeta)
-class Metadata(dict):
-  """Abstract base class for DatasetInfo metadata container.
-
-  `builder.info.metadata` allows the dataset to expose additional general
-  information about the dataset which are not specific to a feature or
-  individual example.
-
-  To implement the interface, overwrite `save_metadata` and
-  `load_metadata`.
-
-  See `tfds.core.MetadataDict` for a simple implementation that acts as a
-  dict that saves data to/from a JSON file.
-  """
-
-  @abc.abstractmethod
-  def save_metadata(self, data_dir):
-    """Save the metadata."""
-    raise NotImplementedError()
-
-  @abc.abstractmethod
-  def load_metadata(self, data_dir):
-    """Restore the metadata."""
-    raise NotImplementedError()
 
 
 def _metadata_filepath(data_dir):

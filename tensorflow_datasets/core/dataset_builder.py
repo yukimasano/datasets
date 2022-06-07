@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,33 +22,35 @@ import inspect
 import json
 import os
 import sys
+import typing
 from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type, Union
 
 from absl import logging
+from etils import epath
 import six
 import tensorflow as tf
-
-from tensorflow_datasets.core import constants
 from tensorflow_datasets.core import dataset_info
 from tensorflow_datasets.core import decode
 from tensorflow_datasets.core import download
 from tensorflow_datasets.core import file_adapters
 from tensorflow_datasets.core import logging as tfds_logging
+from tensorflow_datasets.core import naming
+from tensorflow_datasets.core import reader as reader_lib
 from tensorflow_datasets.core import registered
 from tensorflow_datasets.core import split_builder as split_builder_lib
 from tensorflow_datasets.core import splits as splits_lib
 from tensorflow_datasets.core import tf_compat
-from tensorflow_datasets.core import tfrecords_reader
 from tensorflow_datasets.core import units
 from tensorflow_datasets.core import utils
+from tensorflow_datasets.core.proto import dataset_info_pb2
+from tensorflow_datasets.core.utils import file_utils
 from tensorflow_datasets.core.utils import gcs_utils
 from tensorflow_datasets.core.utils import read_config as read_config_lib
 from tensorflow_datasets.core.utils import type_utils
-
 import termcolor
+if typing.TYPE_CHECKING:
+  from apache_beam.runners import runner
 
-ReadOnlyPath = type_utils.ReadOnlyPath
-ReadWritePath = type_utils.ReadWritePath
 Tree = type_utils.Tree
 TreeDict = type_utils.TreeDict
 VersionOrStr = Union[utils.Version, str]
@@ -79,8 +81,22 @@ class BuilderConfig:
   name: str
   version: Optional[VersionOrStr] = None
   release_notes: Optional[Dict[str, str]] = None
-  supported_versions: List[str] = dataclasses.field(default_factory=list)
+  supported_versions: List[VersionOrStr] = dataclasses.field(
+      default_factory=list)
   description: Optional[str] = None
+
+  @classmethod
+  def from_dataset_info(
+      cls,
+      info_proto: dataset_info_pb2.DatasetInfo) -> Optional["BuilderConfig"]:
+    if not info_proto.config_name:
+      return None
+    return BuilderConfig(
+        name=info_proto.config_name,
+        description=info_proto.config_description,
+        version=info_proto.version,
+        release_notes=info_proto.release_notes or {},
+    )
 
 
 class DatasetBuilder(registered.RegisteredDataset):
@@ -146,7 +162,7 @@ class DatasetBuilder(registered.RegisteredDataset):
   def __init__(
       self,
       *,
-      data_dir: Optional[utils.PathLike] = None,
+      data_dir: Optional[epath.PathLike] = None,
       config: Union[None, str, BuilderConfig] = None,
       version: Union[None, str, utils.Version] = None,
   ):
@@ -157,19 +173,18 @@ class DatasetBuilder(registered.RegisteredDataset):
     Args:
       data_dir: directory to read/write data. Defaults to the value of the
         environment variable TFDS_DATA_DIR, if set, otherwise falls back to
-        "~/tensorflow_datasets".
+        datasets are stored.
       config: `tfds.core.BuilderConfig` or `str` name, optional configuration
         for the dataset that affects the data generated on disk. Different
         `builder_config`s will have their own subdirectories and versions.
-      version: Optional version at which to load the dataset. An error is
-        raised if specified version cannot be satisfied. Eg: '1.2.3', '1.2.*'.
-          The special value "experimental_latest" will use the highest version,
-          even if not default. This is not recommended unless you know what you
-          are doing, as the version could be broken.
+      version: Optional version at which to load the dataset. An error is raised
+        if specified version cannot be satisfied. Eg: '1.2.3', '1.2.*'. The
+        special value "experimental_latest" will use the highest version, even
+        if not default. This is not recommended unless you know what you are
+        doing, as the version could be broken.
     """
     if data_dir:
       data_dir = os.fspath(data_dir)  # Pathlib -> str
-
     # For pickling:
     self._original_state = dict(
         data_dir=data_dir, config=config, version=version)
@@ -187,12 +202,12 @@ class DatasetBuilder(registered.RegisteredDataset):
   @utils.classproperty
   @classmethod
   @utils.memoize()
-  def code_path(cls) -> ReadOnlyPath:
+  def code_path(cls) -> Optional[epath.Path]:
     """Returns the path to the file where the Dataset class is located.
 
     Note: As the code can be run inside zip file. The returned value is
-    a `ReadOnlyPath` by default. Use `tfds.core.utils.to_write_path()` to cast
-    the path into `ReadWritePath`.
+    a `Path` by default. Use `tfds.core.utils.to_write_path()` to cast
+    the path into `Path`.
 
     Returns:
       path: pathlib.Path like abstraction
@@ -203,7 +218,7 @@ class DatasetBuilder(registered.RegisteredDataset):
       # Note: `utils.resource_path` will return either `zipfile.Path` (for
       # zipapp) or `pathlib.Path`.
       try:
-        path = utils.resource_path(modules[0])
+        path = epath.resource_path(modules[0])
       except TypeError:  # Module is not a package
         pass
       else:
@@ -211,12 +226,18 @@ class DatasetBuilder(registered.RegisteredDataset):
         # `pathlib.Path('.')` rather than the real path, so filter those by
         # checking for `parts`.
         # Check for `zipfile.Path` (`ResourcePath`) as it does not have `.parts`
-        if isinstance(path, utils.ResourcePath) or path.parts:
+        if isinstance(path, epath.resource_utils.ResourcePath) or path.parts:
           modules[-1] += ".py"
           return path.joinpath(*modules[1:])
     # Otherwise, fallback to `pathlib.Path`. For non-zipapp, it should be
     # equivalent to the above return.
-    return utils.as_path(inspect.getfile(cls))
+    try:
+      filepath = inspect.getfile(cls)
+    except TypeError:
+      # Could happen when the class is defined in Colab.
+      return None
+    else:
+      return epath.Path(filepath)
 
   def __getstate__(self):
     return self._original_state
@@ -243,7 +264,7 @@ class DatasetBuilder(registered.RegisteredDataset):
         for v in [self.canonical_version] + self.supported_versions
     ]
 
-  def _pick_version(self, requested_version):
+  def _pick_version(self, requested_version) -> utils.Version:
     """Returns utils.Version instance, or raise AssertionError."""
     # Validate that `canonical_version` is correctly defined
     assert self.canonical_version
@@ -259,7 +280,7 @@ class DatasetBuilder(registered.RegisteredDataset):
     raise AssertionError(msg)
 
   @property
-  def version(self):
+  def version(self) -> utils.Version:
     return self._version
 
   @property
@@ -270,21 +291,23 @@ class DatasetBuilder(registered.RegisteredDataset):
       return self.RELEASE_NOTES
 
   @property
-  def data_dir(self):
+  def data_dir(self) -> str:
     return self._data_dir
 
   @property
-  def data_path(self) -> type_utils.ReadWritePath:
+  def data_path(self) -> epath.Path:
     # Instead, should make `_data_dir` be Path everywhere
-    return utils.as_path(self._data_dir)
+    return epath.Path(self._data_dir)
 
   @utils.classproperty
   @classmethod
-  def _checksums_path(cls) -> ReadOnlyPath:
+  def _checksums_path(cls) -> Optional[epath.Path]:
     """Returns the checksums path."""
     # Used:
     # * To load the checksums (in url_infos)
     # * To save the checksums (in DownloadManager)
+    if not cls.code_path:
+      return None
     new_path = cls.code_path.parent / "checksums.tsv"
     # Checksums of legacy datasets are located in a separate dir.
     legacy_path = utils.tfds_path() / "url_checksums" / f"{cls.name}.txt"
@@ -308,7 +331,7 @@ class DatasetBuilder(registered.RegisteredDataset):
     # Search for the url_info file.
     checksums_path = cls._checksums_path
     # If url_info file is found, load the urls
-    if checksums_path.exists():
+    if checksums_path and checksums_path.exists():
       return download.checksums.load_url_infos(checksums_path)
     else:
       return None
@@ -333,7 +356,13 @@ class DatasetBuilder(registered.RegisteredDataset):
           f" {type(info)}.")
     return info
 
-  def download_and_prepare(self, *, download_dir=None, download_config=None):
+  def download_and_prepare(
+      self,
+      *,
+      download_dir: Optional[str] = None,
+      download_config: Optional[download.DownloadConfig] = None,
+      file_format: Union[None, str, file_adapters.FileFormat] = None,
+  ) -> None:
     """Downloads and prepares dataset for reading.
 
     Args:
@@ -341,6 +370,8 @@ class DatasetBuilder(registered.RegisteredDataset):
         to "~/tensorflow-datasets/downloads".
       download_config: `tfds.download.DownloadConfig`, further configuration for
         downloading and preparing dataset.
+      file_format: optional `str` or `file_adapters.FileFormat`, format of the
+        record files in which the dataset will be written.
 
     Raises:
       IOError: if there is not enough disk space available.
@@ -351,6 +382,11 @@ class DatasetBuilder(registered.RegisteredDataset):
     if data_exists and download_config.download_mode == REUSE_DATASET_IF_EXISTS:
       logging.info("Reusing dataset %s (%s)", self.name, self._data_dir)
       return
+    elif data_exists and download_config.download_mode == REUSE_CACHE_IF_EXISTS:
+      logging.info("Deleting pre-existing dataset %s (%s)", self.name,
+                   self._data_dir)
+      epath.Path(self._data_dir).rmtree()  # Delete pre-existing data.
+      data_exists = tf.io.gfile.exists(self._data_dir)
 
     if self.version.tfds_version_to_prepare:
       available_to_prepare = ", ".join(
@@ -424,6 +460,11 @@ class DatasetBuilder(registered.RegisteredDataset):
           default_config_name=self.BUILDER_CONFIGS[0].name,
       )
 
+    # If the file format was specified, set it in the info such that it is used
+    # to generate the files.
+    if file_format:
+      self.info.set_file_format(file_format, override=True)
+
     # Create a tmp dir and rename to self._data_dir on successful exit.
     with utils.incomplete_dir(self._data_dir) as tmp_data_dir:
       # Temporarily assign _data_dir to tmp_data_dir to avoid having to forward
@@ -432,15 +473,15 @@ class DatasetBuilder(registered.RegisteredDataset):
         if (download_config.try_download_gcs and
             gcs_utils.is_dataset_on_gcs(self.info.full_name)):
           logging.info(GCS_HOSTED_MSG, self.name)
-          gcs_utils.download_gcs_dataset(self.info.full_name, self._data_dir)
+          gcs_utils.download_gcs_dataset(
+              dataset_name=self.info.full_name,
+              local_dataset_dir=self._data_dir)
           self.info.read_from_directory(self._data_dir)
         else:
-          # Old version of TF are not os.PathLike compatible
-          with tf_compat.mock_gfile_pathlike():
-            self._download_and_prepare(
-                dl_manager=dl_manager,
-                download_config=download_config,
-            )
+          self._download_and_prepare(
+              dl_manager=dl_manager,
+              download_config=download_config,
+          )
 
           # NOTE: If modifying the lines below to put additional information in
           # DatasetInfo, you'll likely also want to update
@@ -449,6 +490,8 @@ class DatasetBuilder(registered.RegisteredDataset):
           self.info.download_size = dl_manager.downloaded_size
           # Write DatasetInfo to disk, even if we haven't computed statistics.
           self.info.write_to_directory(self._data_dir)
+      # The generated DatasetInfo contains references to `tmp_data_dir`
+      self.info.update_data_dir(self._data_dir)
     self._log_download_done()
 
   @tfds_logging.as_dataset()
@@ -458,7 +501,7 @@ class DatasetBuilder(registered.RegisteredDataset):
       *,
       batch_size: Optional[int] = None,
       shuffle_files: bool = False,
-      decoders: Optional[TreeDict[decode.Decoder]] = None,
+      decoders: Optional[TreeDict[decode.partial_decode.DecoderArg]] = None,
       read_config: Optional[read_config_lib.ReadConfig] = None,
       as_supervised: bool = False,
   ):
@@ -509,9 +552,9 @@ class DatasetBuilder(registered.RegisteredDataset):
 
     Args:
       split: Which split of the data to load (e.g. `'train'`, `'test'`,
-        `['train', 'test']`, `'train[80%:]'`,...). See our
-        [split API guide](https://www.tensorflow.org/datasets/splits). If
-          `None`, will return all splits in a `Dict[Split, tf.data.Dataset]`.
+        `['train', 'test']`, `'train[80%:]'`,...). See our [split API
+        guide](https://www.tensorflow.org/datasets/splits). If `None`, will
+        return all splits in a `Dict[Split, tf.data.Dataset]`.
       batch_size: `int`, batch size. Note that variable-length features will be
         0-padded if `batch_size` is set. Users that want more custom behavior
         should use `batch_size=None` and use the `tf.data` API to construct a
@@ -522,8 +565,8 @@ class DatasetBuilder(registered.RegisteredDataset):
       decoders: Nested dict of `Decoder` objects which allow to customize the
         decoding. The structure should match the feature structure, but only
         customized feature keys need to be present. See [the
-          guide](https://github.com/tensorflow/datasets/tree/master/docs/decode.md)
-            for more info.
+        guide](https://github.com/tensorflow/datasets/blob/master/docs/decode.md)
+        for more info.
       read_config: `tfds.ReadConfig`, Additional options to configure the input
         pipeline (e.g. seed, num parallel reads,...).
       as_supervised: `bool`, if `True`, the returned `tf.data.Dataset` will have
@@ -566,13 +609,13 @@ class DatasetBuilder(registered.RegisteredDataset):
 
   def _build_single_dataset(
       self,
-      split,
-      shuffle_files,
-      batch_size,
-      decoders,
-      read_config,
-      as_supervised,
-  ):
+      split: splits_lib.Split,
+      batch_size: Optional[int],
+      shuffle_files: bool,
+      decoders: Optional[TreeDict[decode.partial_decode.DecoderArg]],
+      read_config: read_config_lib.ReadConfig,
+      as_supervised: bool,
+  ) -> tf.data.Dataset:
     """as_dataset for a single split."""
     wants_full_dataset = batch_size == -1
     if wants_full_dataset:
@@ -621,24 +664,11 @@ class DatasetBuilder(registered.RegisteredDataset):
     if not read_config.skip_prefetch:
       ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
 
-    # If shuffling is True and seeds not set, allow pipeline to be
-    # non-deterministic
-    # This code should probably be moved inside tfreader, such as
-    # all the tf.data.Options are centralized in a single place.
-    if (shuffle_files and
-        read_config.options.experimental_deterministic is None and
-        read_config.shuffle_seed is None):
-      options = tf.data.Options()
-      options.experimental_deterministic = False
-      ds = ds.with_options(options)
-    # If shuffle is False, keep the default value (deterministic), which
-    # allow the user to overwritte it.
-
     if wants_full_dataset:
       return tf_compat.get_single_element(ds)
     return ds
 
-  def _should_cache_ds(self, split, shuffle_files, read_config):
+  def _should_cache_ds(self, split, shuffle_files, read_config) -> bool:
     """Returns True if TFDS should auto-cache the dataset."""
     # The user can explicitly opt-out from auto-caching
     if not read_config.try_autocache:
@@ -663,7 +693,7 @@ class DatasetBuilder(registered.RegisteredDataset):
       return False
 
     # We do not want to cache data which has more than one shards when
-    # shuffling is enabled, as this would effectivelly disable shuffling.
+    # shuffling is enabled, as this would effectively disable shuffling.
     # An exception is for single shard (as shuffling is a no-op).
     # Another exception is if reshuffle is disabled (shuffling already cached)
     num_shards = len(self.info.splits[split].file_instructions)
@@ -676,7 +706,7 @@ class DatasetBuilder(registered.RegisteredDataset):
     # If the dataset satisfy all the right conditions, activate autocaching.
     return True
 
-  def _relative_data_dir(self, with_version=True):
+  def _relative_data_dir(self, with_version: bool = True) -> str:
     """Relative path of this dataset in data_dir."""
     builder_data_dir = self.name
     builder_config = self._builder_config
@@ -688,7 +718,7 @@ class DatasetBuilder(registered.RegisteredDataset):
     version_data_dir = os.path.join(builder_data_dir, str(self._version))
     return version_data_dir
 
-  def _build_data_dir(self, given_data_dir):
+  def _build_data_dir(self, given_data_dir: Optional[str]):
     """Return the data directory for the current version.
 
     Args:
@@ -703,9 +733,10 @@ class DatasetBuilder(registered.RegisteredDataset):
     builder_dir = self._relative_data_dir(with_version=False)
     version_dir = self._relative_data_dir(with_version=True)
 
-    default_data_dir = constants.get_default_data_dir(
+    default_data_dir = file_utils.get_default_data_dir(
         given_data_dir=given_data_dir)
-    all_data_dirs = constants.list_data_dirs(given_data_dir=given_data_dir)
+    all_data_dirs = file_utils.list_data_dirs(
+        given_data_dir=given_data_dir, dataset=self.name)
 
     all_versions = set()
     requested_version_dirs = {}
@@ -737,12 +768,12 @@ class DatasetBuilder(registered.RegisteredDataset):
           data_dir)
     return default_data_dir, data_dir
 
-  def _log_download_done(self):
+  def _log_download_done(self) -> None:
     msg = (f"Dataset {self.name} downloaded and prepared to {self._data_dir}. "
            "Subsequent calls will reuse this data.")
     termcolor.cprint(msg, attrs=["bold"])
 
-  def _log_download_bytes(self):
+  def _log_download_bytes(self) -> None:
     # Print is intentional: we want this to always go to stdout so user has
     # information needed to cancel download/preparation if needed.
     # This comes right before the progress bar.
@@ -757,7 +788,7 @@ class DatasetBuilder(registered.RegisteredDataset):
 
   @abc.abstractmethod
   @utils.docs.doc_private
-  def _info(self):
+  def _info(self) -> dataset_info.DatasetInfo:
     """Returns the `tfds.core.DatasetInfo` object.
 
     This function is called once and the result is cached for all
@@ -769,7 +800,11 @@ class DatasetBuilder(registered.RegisteredDataset):
     raise NotImplementedError
 
   @abc.abstractmethod
-  def _download_and_prepare(self, dl_manager, download_config=None):
+  def _download_and_prepare(
+      self,
+      dl_manager: download.DownloadManager,
+      download_config: Optional[download.DownloadConfig] = None,
+  ) -> None:
     """Downloads and prepares dataset for reading.
 
     Internal implementation to overwrite when inheriting from DatasetBuilder.
@@ -785,11 +820,13 @@ class DatasetBuilder(registered.RegisteredDataset):
     raise NotImplementedError
 
   @abc.abstractmethod
-  def _as_dataset(self,
-                  split,
-                  decoders=None,
-                  read_config=None,
-                  shuffle_files=False):
+  def _as_dataset(
+      self,
+      split: splits_lib.Split,
+      decoders: Optional[TreeDict[decode.partial_decode.DecoderArg]] = None,
+      read_config: Optional[read_config_lib.ReadConfig] = None,
+      shuffle_files: bool = False,
+  ) -> tf.data.Dataset:
     """Constructs a `tf.data.Dataset`.
 
     Internal implementation to overwrite when inheriting from DatasetBuilder.
@@ -810,7 +847,11 @@ class DatasetBuilder(registered.RegisteredDataset):
     """
     raise NotImplementedError
 
-  def _make_download_manager(self, download_dir, download_config):
+  def _make_download_manager(
+      self,
+      download_dir,
+      download_config,
+  ) -> download.DownloadManager:
     """Creates a new download manager object."""
     download_dir = (
         download_dir or os.path.join(self._data_dir_root, "downloads"))
@@ -842,11 +883,11 @@ class DatasetBuilder(registered.RegisteredDataset):
     )
 
   @property
-  def builder_config(self):
+  def builder_config(self) -> Optional[Any]:
     """`tfds.core.BuilderConfig` for this builder."""
     return self._builder_config
 
-  def _create_builder_config(self, builder_config):
+  def _create_builder_config(self, builder_config) -> Optional[BuilderConfig]:
     """Create and validate BuilderConfig object."""
     if builder_config is None and self.BUILDER_CONFIGS:
       builder_config = self.BUILDER_CONFIGS[0]
@@ -924,10 +965,10 @@ class FileReaderBuilder(DatasetBuilder):
 
   def _as_dataset(
       self,
-      split,
-      decoders,
-      read_config,
-      shuffle_files,
+      split: splits_lib.Split,
+      decoders: Optional[TreeDict[decode.partial_decode.DecoderArg]],
+      read_config: read_config_lib.ReadConfig,
+      shuffle_files: bool,
   ) -> tf.data.Dataset:
     # Partial decoding
     # TODO(epot): Should be moved inside `features.decode_example`
@@ -941,14 +982,13 @@ class FileReaderBuilder(DatasetBuilder):
       example_specs = self._example_specs
       decoders = decoders  # pylint: disable=self-assigning-variable
 
-    reader = tfrecords_reader.Reader(
+    reader = reader_lib.Reader(
         self._data_dir,
         example_specs=example_specs,
         file_format=self.info.file_format,
     )
     decode_fn = functools.partial(features.decode_example, decoders=decoders)
     return reader.read(
-        name=self.name,
         instructions=split,
         split_infos=self.info.splits.values(),
         decode_fn=decode_fn,
@@ -1098,6 +1138,16 @@ class GeneratorBasedBuilder(FileReaderBuilder):
     """
     raise NotImplementedError()
 
+  def _process_pipeline_result(
+      self, pipeline_result: "runner.PipelineResult") -> None:
+    """Processes the result of the beam pipeline if we used one.
+
+    This can be used to (e.g) write beam counters to a file.
+    Args:
+      pipeline_result: PipelineResult returned by beam.Pipeline.run().
+    """
+    return
+
   def _download_and_prepare(
       self,
       dl_manager: download.DownloadManager,
@@ -1119,11 +1169,13 @@ class GeneratorBasedBuilder(FileReaderBuilder):
     # By auto-detecting Beam, the user only has to change `_generate_examples`
     # to go from non-beam to beam dataset:
     # https://www.tensorflow.org/datasets/beam_datasets#instructions
-    with split_builder.maybe_beam_pipeline():
+    with split_builder.maybe_beam_pipeline() as maybe_pipeline_proxy:
       # If the signature has a `pipeline` kwargs, create the pipeline now and
       # forward it to `self._split_generators`
       # We add this magic because the pipeline kwargs is only used by c4 and
       # we do not want to make the API more verbose for a single advanced case.
+      # See also the documentation at the end here:
+      # https://www.tensorflow.org/datasets/api_docs/python/tfds/core/GeneratorBasedBuilder?version=nightly#_generate_examples
       signature = inspect.signature(self._split_generators)
       if "pipeline" in signature.parameters.keys():
         optional_pipeline_kwargs = dict(pipeline=split_builder.beam_pipeline)
@@ -1151,24 +1203,35 @@ class GeneratorBasedBuilder(FileReaderBuilder):
       path_suffix = file_adapters.ADAPTER_FOR_FORMAT[
           self.info.file_format].FILE_SUFFIX
 
-      split_info_futures = [
-          split_builder.submit_split_generation(  # pylint: disable=g-complex-comprehension
-              split_name=split_name,
-              generator=generator,
-              path=self.data_path / f"{self.name}-{split_name}.{path_suffix}",
-              disable_shuffling=self.info.disable_shuffling,
-          ) for split_name, generator in utils.tqdm(
-              split_generators.items(),
-              desc="Generating splits...",
-              unit=" splits",
-              leave=False,
-          )
-      ]
+      split_info_futures = []
+      for split_name, generator in utils.tqdm(
+          split_generators.items(),
+          desc="Generating splits...",
+          unit=" splits",
+          leave=False,
+      ):
+        filename_template = naming.ShardedFileTemplate(
+            split=split_name,
+            dataset_name=self.name,
+            data_dir=self.data_path,
+            filetype_suffix=path_suffix)
+        future = split_builder.submit_split_generation(
+            split_name=split_name,
+            generator=generator,
+            filename_template=filename_template,
+            disable_shuffling=self.info.disable_shuffling,
+        )
+        split_info_futures.append(future)
+
+    # Process the result of the beam pipeline.
+    if maybe_pipeline_proxy._beam_pipeline:  # pylint:disable=protected-access
+      self._process_pipeline_result(pipeline_result=maybe_pipeline_proxy.result)
+
     # Finalize the splits (after apache beam completed, if it was used)
     split_infos = [future.result() for future in split_info_futures]
 
     # Update the info object with the splits.
-    split_dict = splits_lib.SplitDict(split_infos, dataset_name=self.name)
+    split_dict = splits_lib.SplitDict(split_infos)
     self.info.set_splits(split_dict)
 
 
@@ -1192,7 +1255,7 @@ def _check_split_names(split_names: Iterable[str]) -> None:
 
 
 def _save_default_config_name(
-    common_dir: ReadWritePath,
+    common_dir: epath.Path,
     *,
     default_config_name: str,
 ) -> None:
@@ -1214,9 +1277,9 @@ def _save_default_config_name(
     tmp_config_path.write_text(json.dumps(data))
 
 
-def load_default_config_name(common_dir: ReadOnlyPath,) -> Optional[str]:
+def load_default_config_name(common_dir: epath.Path,) -> Optional[str]:
   """Load `builder_cls` metadata (common to all builder configs)."""
-  config_path = common_dir / ".config/metadata.json"
+  config_path = epath.Path(common_dir) / ".config/metadata.json"
   if not config_path.exists():
     return None
   data = json.loads(config_path.read_text())

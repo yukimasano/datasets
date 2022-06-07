@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,14 +17,14 @@
 
 from typing import Dict, Text, Tuple
 
+from etils import epath
 import numpy as np
 import tensorflow as tf
-from tensorflow_datasets.core.utils import type_utils
 import tensorflow_datasets.public_api as tfds
 
 # Type hints.
 ArrayDict = Dict[Text, np.ndarray]
-ReadOnlyPath = type_utils.ReadOnlyPath
+Path = epath.Path
 
 _DESCRIPTION = """
 'ogbg-molpcba' is a molecular dataset sampled from PubChem BioAssay.
@@ -217,10 +217,8 @@ class OgbgMolpcba(tfds.core.GeneratorBasedBuilder):
       yield idx, record
 
 
-def _read_extracted_data(
-    data_path: ReadOnlyPath,
-    split_path: ReadOnlyPath
-) -> Tuple[ArrayDict, ArrayDict]:
+def _read_extracted_data(data_path: Path,
+                         split_path: Path) -> Tuple[ArrayDict, ArrayDict]:
   """Reads and processes the extracted graph data and splits."""
   pd = tfds.core.lazy_imports.pandas
 

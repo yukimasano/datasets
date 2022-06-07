@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 
 import functools
 import importlib
-from typing import TypeVar
+from typing import Any, Callable, TypeVar
 
 from tensorflow_datasets.core.utils import py_utils as utils
 
@@ -72,6 +72,11 @@ class LazyImporter(object):
 
   @utils.classproperty
   @classmethod
+  def gcsfs_store(cls):
+    return _try_import("gcsfs").GCSFileSystem(token='anon').get_mapper
+
+  @utils.classproperty
+  @classmethod
   def gcld3(cls):
     return _try_import("gcld3")  # pylint: disable=unreachable
 
@@ -80,6 +85,10 @@ class LazyImporter(object):
   def h5py(cls):
     return _try_import("h5py")
 
+  @utils.classproperty
+  @classmethod
+  def jax(cls):
+    return _try_import("jax")
 
   @utils.classproperty
   @classmethod
@@ -202,11 +211,16 @@ class LazyImporter(object):
     """For testing purposes only."""
     return _try_import("test_foo")
 
+  @utils.classproperty
+  @classmethod
+  def zarr(cls):
+    return _try_import("zarr")
+
 
 lazy_imports = LazyImporter  # pylint: disable=invalid-name
 
 
-def beam_ptransform_fn(fn: _Fn) -> _Fn:
+def beam_ptransform_fn(fn: Callable[..., Any]) -> Callable[..., Any]:
   """Lazy version of `@beam.ptransform_fn`."""
 
   lazy_decorated_fn = None

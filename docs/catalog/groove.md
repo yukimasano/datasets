@@ -36,6 +36,10 @@ captured on a Roland TD-11 V-Drum electronic drum kit.
     ([tfds.show_examples](https://www.tensorflow.org/datasets/api_docs/python/tfds/visualization/show_examples)):
     Not supported.
 
+*   **Examples**
+    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
+    Missing.
+
 *   **Citation**:
 
 ```
@@ -46,6 +50,7 @@ captured on a Roland TD-11 V-Drum electronic drum kit.
     Year = {2019},
 }
 ```
+
 
 ## groove/full-midionly (default config)
 
@@ -67,7 +72,7 @@ Split          | Examples
 `'train'`      | 897
 `'validation'` | 124
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
@@ -84,39 +89,20 @@ FeaturesDict({
 })
 ```
 
-*   **Examples**
-    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
+*   **Feature documentation**:
 
-<!-- mdformat off(HTML should not be auto-formatted) -->
-
-{% framebox %}
-
-<button id="displaydataframe">Display examples...</button>
-<div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
-<script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/groove-full-midionly-2.0.1.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
-
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
-        'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
-});
-</script>
-
-{% endframebox %}
-
-<!-- mdformat on -->
+Feature         | Class        | Shape | Dtype     | Description
+:-------------- | :----------- | :---- | :-------- | :----------
+                | FeaturesDict |       |           |
+bpm             | Tensor       |       | tf.int32  |
+drummer         | ClassLabel   |       | tf.int64  |
+id              | Tensor       |       | tf.string |
+midi            | Tensor       |       | tf.string |
+style           | FeaturesDict |       |           |
+style/primary   | ClassLabel   |       | tf.int64  |
+style/secondary | Tensor       |       | tf.string |
+time_signature  | ClassLabel   |       | tf.int64  |
+type            | ClassLabel   |       | tf.int64  |
 
 ## groove/full-16000hz
 
@@ -138,7 +124,7 @@ Split          | Examples
 `'train'`      | 846
 `'validation'` | 120
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
@@ -156,39 +142,21 @@ FeaturesDict({
 })
 ```
 
-*   **Examples**
-    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
+*   **Feature documentation**:
 
-<!-- mdformat off(HTML should not be auto-formatted) -->
-
-{% framebox %}
-
-<button id="displaydataframe">Display examples...</button>
-<div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
-<script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/groove-full-16000hz-2.0.1.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
-
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
-        'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
-});
-</script>
-
-{% endframebox %}
-
-<!-- mdformat on -->
+Feature         | Class        | Shape   | Dtype      | Description
+:-------------- | :----------- | :------ | :--------- | :----------
+                | FeaturesDict |         |            |
+audio           | Audio        | (None,) | tf.float32 |
+bpm             | Tensor       |         | tf.int32   |
+drummer         | ClassLabel   |         | tf.int64   |
+id              | Tensor       |         | tf.string  |
+midi            | Tensor       |         | tf.string  |
+style           | FeaturesDict |         |            |
+style/primary   | ClassLabel   |         | tf.int64   |
+style/secondary | Tensor       |         | tf.string  |
+time_signature  | ClassLabel   |         | tf.int64   |
+type            | ClassLabel   |         | tf.int64   |
 
 ## groove/2bar-midionly
 
@@ -211,7 +179,7 @@ Split          | Examples
 `'train'`      | 18,163
 `'validation'` | 2,252
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
@@ -228,39 +196,20 @@ FeaturesDict({
 })
 ```
 
-*   **Examples**
-    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
+*   **Feature documentation**:
 
-<!-- mdformat off(HTML should not be auto-formatted) -->
-
-{% framebox %}
-
-<button id="displaydataframe">Display examples...</button>
-<div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
-<script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/groove-2bar-midionly-2.0.1.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
-
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
-        'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
-});
-</script>
-
-{% endframebox %}
-
-<!-- mdformat on -->
+Feature         | Class        | Shape | Dtype     | Description
+:-------------- | :----------- | :---- | :-------- | :----------
+                | FeaturesDict |       |           |
+bpm             | Tensor       |       | tf.int32  |
+drummer         | ClassLabel   |       | tf.int64  |
+id              | Tensor       |       | tf.string |
+midi            | Tensor       |       | tf.string |
+style           | FeaturesDict |       |           |
+style/primary   | ClassLabel   |       | tf.int64  |
+style/secondary | Tensor       |       | tf.string |
+time_signature  | ClassLabel   |       | tf.int64  |
+type            | ClassLabel   |       | tf.int64  |
 
 ## groove/2bar-16000hz
 
@@ -282,7 +231,7 @@ Split          | Examples
 `'train'`      | 14,390
 `'validation'` | 2,034
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
@@ -300,39 +249,21 @@ FeaturesDict({
 })
 ```
 
-*   **Examples**
-    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
+*   **Feature documentation**:
 
-<!-- mdformat off(HTML should not be auto-formatted) -->
-
-{% framebox %}
-
-<button id="displaydataframe">Display examples...</button>
-<div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
-<script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/groove-2bar-16000hz-2.0.1.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
-
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
-        'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
-});
-</script>
-
-{% endframebox %}
-
-<!-- mdformat on -->
+Feature         | Class        | Shape   | Dtype      | Description
+:-------------- | :----------- | :------ | :--------- | :----------
+                | FeaturesDict |         |            |
+audio           | Audio        | (None,) | tf.float32 |
+bpm             | Tensor       |         | tf.int32   |
+drummer         | ClassLabel   |         | tf.int64   |
+id              | Tensor       |         | tf.string  |
+midi            | Tensor       |         | tf.string  |
+style           | FeaturesDict |         |            |
+style/primary   | ClassLabel   |         | tf.int64   |
+style/secondary | Tensor       |         | tf.string  |
+time_signature  | ClassLabel   |         | tf.int64   |
+type            | ClassLabel   |         | tf.int64   |
 
 ## groove/4bar-midionly
 
@@ -355,7 +286,7 @@ Split          | Examples
 `'train'`      | 17,261
 `'validation'` | 2,121
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
@@ -372,36 +303,17 @@ FeaturesDict({
 })
 ```
 
-*   **Examples**
-    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
+*   **Feature documentation**:
 
-<!-- mdformat off(HTML should not be auto-formatted) -->
-
-{% framebox %}
-
-<button id="displaydataframe">Display examples...</button>
-<div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
-<script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/groove-4bar-midionly-2.0.1.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
-
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
-        'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
-});
-</script>
-
-{% endframebox %}
-
-<!-- mdformat on -->
+Feature         | Class        | Shape | Dtype     | Description
+:-------------- | :----------- | :---- | :-------- | :----------
+                | FeaturesDict |       |           |
+bpm             | Tensor       |       | tf.int32  |
+drummer         | ClassLabel   |       | tf.int64  |
+id              | Tensor       |       | tf.string |
+midi            | Tensor       |       | tf.string |
+style           | FeaturesDict |       |           |
+style/primary   | ClassLabel   |       | tf.int64  |
+style/secondary | Tensor       |       | tf.string |
+time_signature  | ClassLabel   |       | tf.int64  |
+type            | ClassLabel   |       | tf.int64  |

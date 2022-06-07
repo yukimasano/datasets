@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -127,7 +127,7 @@ class GlueConfig(tfds.core.BuilderConfig):
             "1.0.1": "Update dead URL links.",
             "2.0.0": "Update data source for glue/qqp.",
         },
-        **kwargs)
+        **kwargs)  # pytype: disable=wrong-arg-types  # gen-stub-imports
     self.text_features = text_features
     self.label_column = label_column
     self.label_classes = label_classes
@@ -235,7 +235,7 @@ class Glue(tfds.core.GeneratorBasedBuilder):
             The Semantic Textual Similarity Benchmark (Cer et al., 2017) is a collection of
             sentence pairs drawn from news headlines, video and image captions, and natural
             language inference data. Each pair is human-annotated with a similarity score
-            from 1 to 5."""),
+            from 0 to 5."""),
           text_features={
               "sentence1": "sentence1",
               "sentence2": "sentence2",

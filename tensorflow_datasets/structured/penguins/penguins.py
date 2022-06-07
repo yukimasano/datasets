@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -205,7 +205,7 @@ class Penguins(tfds.core.GeneratorBasedBuilder):
 
   def _generate_examples(self, path):
     """Yields examples."""
-    with path.open() as f:
+    with path.open() as f:  # pytype: disable=attribute-error  # gen-stub-imports
       for i, row in enumerate(csv.DictReader(f)):
         row = {f: self._clean_up(f, v) for f, v in row.items()}
 

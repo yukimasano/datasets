@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,9 +20,9 @@ import json
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from etils import epath
 import numpy as np
 import tensorflow as tf
-import tensorflow_datasets.core.utils.type_utils as type_utils
 import tensorflow_datasets.public_api as tfds
 
 _DESCRIPTION = """
@@ -60,13 +60,14 @@ NUM_TRAIN_EXAMPLES = 2238
 NestedDict = Dict[str, Any]
 
 
-def _convert_bbox(box: List[float], height: int, width: int) -> List[float]:
+def _convert_bbox(box: List[float], height: int,
+                  width: int) -> tfds.features.BBox:
   """Converts bbox from coco x,y,w,h to xmin, ymin, xmax, ymax tfds format."""
   return tfds.features.BBox(
       xmin=box[0] / width,
       ymin=box[1] / height,
       xmax=(box[0] + box[2]) / width,
-      ymax=(box[1] + box[3]) / height)
+      ymax=(box[1] + box[3]) / height)  # pytype: disable=bad-return-type  # gen-stub-imports
 
 
 def _decode_segmentation(segmentation: Union[List[NestedDict],
@@ -91,7 +92,7 @@ def _decode_segmentation(segmentation: Union[List[NestedDict],
 
 
 def _find_frame_index(frame_filename: str,
-                      all_video_frame_paths: List[type_utils.PathLike]) -> int:
+                      all_video_frame_paths: List[epath.PathLike]) -> int:
   for index, path in enumerate(all_video_frame_paths):
     if frame_filename in os.fspath(path):
       return index
@@ -102,7 +103,7 @@ def _find_frame_index(frame_filename: str,
 
 def _create_per_track_annotation(
     video: NestedDict,
-    all_video_frame_paths: List[type_utils.PathLike],
+    all_video_frame_paths: List[epath.PathLike],
     track_annotation: NestedDict,
     desired_height: Optional[int] = None,
     desired_width: Optional[int] = None) -> NestedDict:
@@ -400,7 +401,7 @@ class YoutubeVis(tfds.core.BeamBasedBuilder):
     seg_shape = (None, self.builder_config.height, self.builder_config.width, 1)
     all_features = {
         'video':
-            tfds.features.Video(video_shape),
+            tfds.features.Video(video_shape),  # pytype: disable=wrong-arg-types  # gen-stub-imports
         'metadata': {
             'height': tf.int32,
             'width': tf.int32,
@@ -412,7 +413,7 @@ class YoutubeVis(tfds.core.BeamBasedBuilder):
                 'bboxes':
                     tfds.features.Sequence(tfds.features.BBoxFeature()),
                 'segmentations':
-                    tfds.features.Video(seg_shape, use_colormap=True),
+                    tfds.features.Video(seg_shape, use_colormap=True),  # pytype: disable=wrong-arg-types  # gen-stub-imports
                 'category':
                     tfds.features.ClassLabel(names_file=names_file),
                 'is_crowd':
@@ -519,8 +520,8 @@ class YoutubeVis(tfds.core.BeamBasedBuilder):
     return resized_images
 
   def _generate_examples(self,
-                         annotations: type_utils.ReadOnlyPath,
-                         all_frames: type_utils.ReadOnlyPath,
+                         annotations: epath.Path,
+                         all_frames: epath.Path,
                          video_range_to_use: Optional[Tuple[int, int]] = None):
     beam = tfds.core.lazy_imports.apache_beam
     annotations = json.loads(annotations.read_text())

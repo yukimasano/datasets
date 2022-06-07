@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,14 +49,20 @@ from tensorflow_datasets import graphs
 from tensorflow_datasets import image
 from tensorflow_datasets import image_classification
 from tensorflow_datasets import object_detection
+from tensorflow_datasets import nearest_neighbors
 from tensorflow_datasets import question_answering
 from tensorflow_datasets import d4rl
 from tensorflow_datasets import ranking
+from tensorflow_datasets import recommendation
 from tensorflow_datasets import rl_unplugged
 from tensorflow_datasets import rlds
+from tensorflow_datasets import robotics
+from tensorflow_datasets import robomimic
 from tensorflow_datasets import structured
 from tensorflow_datasets import summarization
 from tensorflow_datasets import text
+from tensorflow_datasets import text_simplification
+from tensorflow_datasets import time_series
 from tensorflow_datasets import translate
 from tensorflow_datasets import video
 from tensorflow_datasets import vision_language

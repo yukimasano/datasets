@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ from unittest import mock
 
 from absl import logging
 from absl.testing import parameterized
+from etils import epath
 import numpy as np
 import tensorflow as tf
 
@@ -99,11 +100,15 @@ class DatasetBuilderTestCase(parameterized.TestCase,
     * BUILDER_CONFIG_NAMES_TO_TEST: `list[str | tfds.core.BuilderConfig]`,
       the list of builder configs that should be tested. If None, all the
       BUILDER_CONFIGS from the class will be tested.
-    * DL_EXTRACT_RESULT: `dict[str]`, the returned result of mocked
+    * DL_EXTRACT_RESULT: `dict[str, str]`, the returned result of mocked
       `download_and_extract` method. The values should be the path of files
       present in the `fake_examples` directory, relative to that directory.
       If not specified, path to `fake_examples` will always be returned.
-    * DL_DOWNLOAD_RESULT: `dict[str]`, the returned result of mocked
+    * DL_EXTRACT_ONLY_RESULT: `dict[str, str]`, the returned result of mocked
+      `extract` method. The values should be the path of files present in the
+      `fake_examples` directory, relative to that directory. If not specified:
+      will call DownloadManager `extract` method.
+    * DL_DOWNLOAD_RESULT: `dict[str, str]`, the returned result of mocked
       `download_and_extract` method. The values should be the path of files
       present in the `fake_examples` directory, relative to that directory.
       If not specified: will use DL_EXTRACT_RESULT (this is due to backwards
@@ -138,8 +143,9 @@ class DatasetBuilderTestCase(parameterized.TestCase,
   VERSION = None
   BUILDER_CONFIG_NAMES_TO_TEST: Optional[List[Union[
       str, dataset_builder.BuilderConfig]]] = None
-  DL_EXTRACT_RESULT = None
-  DL_DOWNLOAD_RESULT = None
+  DL_EXTRACT_RESULT: Optional[str] = None
+  DL_EXTRACT_ONLY_RESULT: Optional[str] = None
+  DL_DOWNLOAD_RESULT: Optional[str] = None
   EXAMPLE_DIR = None
   OVERLAPPING_SPLITS = []
   MOCK_OUT_FORBIDDEN_OS_FUNCTIONS = True
@@ -190,15 +196,15 @@ class DatasetBuilderTestCase(parameterized.TestCase,
   @utils.classproperty
   @classmethod
   @utils.memoize()
-  def dummy_data(cls) -> utils.ReadOnlyPath:  # pylint: disable=no-self-argument
+  def dummy_data(cls) -> epath.Path:  # pylint: disable=no-self-argument
     """Path to the `dummy_data/` directory."""
     if cls is DatasetBuilderTestCase:  # Required for build_api_docs
       return None  # pytype: disable=bad-return-type
 
     dummy_data_expected = cls.DATASET_CLASS.code_path.parent / "dummy_data"
-    fake_example_dir = utils.as_path(test_utils.fake_examples_dir())
+    fake_example_dir = epath.Path(test_utils.fake_examples_dir())
     if cls.EXAMPLE_DIR is not None:
-      dummy_data_found = utils.as_path(cls.EXAMPLE_DIR)
+      dummy_data_found = epath.Path(cls.EXAMPLE_DIR)
       dummy_data_expected = dummy_data_found  # Dir to display in the error
     elif dummy_data_expected.exists():
       dummy_data_found = dummy_data_expected
@@ -277,6 +283,14 @@ class DatasetBuilderTestCase(parameterized.TestCase,
         self.DL_EXTRACT_RESULT,
     )
 
+  def _get_dl_extract_only_result(self, url):
+    if self.DL_EXTRACT_ONLY_RESULT:
+      tf.nest.map_structure(self._add_url, url)
+      return tf.nest.map_structure(
+          lambda fname: self.dummy_data / fname,
+          self.DL_EXTRACT_ONLY_RESULT,
+      )
+
   def _get_dl_download_result(self, url):
     tf.nest.map_structure(self._add_url, url)
     if self.DL_DOWNLOAD_RESULT is None:
@@ -342,7 +356,7 @@ class DatasetBuilderTestCase(parameterized.TestCase,
     err_msg = (
         "Did you forget to record checksums with `--register_checksums` ? See "
         "instructions at: "
-        "hhttps://www.tensorflow.org/datasets/add_dataset#run_the_generation_codeIf"
+        "https://www.tensorflow.org/datasets/add_dataset#run_the_generation_codeIf"
         " want to opt-out of checksums validation, please add `SKIP_CHECKSUMS "
         "= True` to the `DatasetBuilderTestCase`.\n")
     url_infos = self.DATASET_CLASS.url_infos
@@ -375,14 +389,19 @@ class DatasetBuilderTestCase(parameterized.TestCase,
     manual_dir = (
         self.dummy_data
         if builder.MANUAL_DOWNLOAD_INSTRUCTIONS else missing_dir_mock)
+
+    patches = {
+        "download_and_extract": self._get_dl_extract_result,
+        "download": self._get_dl_download_result,
+        "download_checksums": self._download_checksums,
+        "manual_dir": manual_dir,
+        "download_dir": self.dummy_data
+    }
+    if self.DL_EXTRACT_ONLY_RESULT:
+      patches["extract"] = self._get_dl_extract_only_result
+
     with mock.patch.multiple(
-        "tensorflow_datasets.core.download.DownloadManager",
-        download_and_extract=self._get_dl_extract_result,
-        download=self._get_dl_download_result,
-        download_checksums=self._download_checksums,
-        manual_dir=manual_dir,
-        download_dir=self.dummy_data,
-    ):
+        "tensorflow_datasets.core.download.DownloadManager", **patches):
       # For Beam datasets, set-up the runner config
       beam_runner = None
 
@@ -574,4 +593,5 @@ def compare_shapes_and_types(tensor_info, element_spec):
         raise TypeError(
             f"Feature {feature_name} has type {feature_info} but expected {spec}"
         )
-      utils.assert_shape_match(feature_info.shape, spec._shape)  # pylint: disable=protected-access
+      utils.assert_tf_shape_match(
+          tf.TensorShape(feature_info.shape), spec._shape)  # pylint: disable=protected-access

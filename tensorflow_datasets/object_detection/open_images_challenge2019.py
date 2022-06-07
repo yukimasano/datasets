@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -69,7 +69,7 @@ class OpenImagesChallenge2019Config(tfds.core.BuilderConfig):
     return self._target_pixels
 
 
-class _OpenImagesChallenge2019(tfds.core.BeamBasedBuilder):
+class _OpenImagesChallenge2019(tfds.core.BeamBasedBuilder):  # pytype: disable=ignored-abstractmethod  # abcmeta-check
   """Base abstract class for Open Images Challenge 2019 datasets."""
 
   BUILDER_CONFIGS = [

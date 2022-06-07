@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,12 +18,15 @@
 import html
 import os
 import textwrap
+from typing import Union
 
 from absl import logging
 import tensorflow as tf
 
 from tensorflow_datasets.core.deprecated import text as text_lib
+from tensorflow_datasets.core.features import feature as feature_lib
 from tensorflow_datasets.core.features import tensor_feature
+from tensorflow_datasets.core.proto import feature_pb2
 from tensorflow_datasets.core.utils import type_utils
 
 Json = type_utils.Json
@@ -32,7 +35,13 @@ Json = type_utils.Json
 class Text(tensor_feature.Tensor):
   """`FeatureConnector` for text, encoding to integers with a `TextEncoder`."""
 
-  def __init__(self, encoder=None, encoder_config=None):
+  def __init__(
+      self,
+      encoder=None,
+      encoder_config=None,
+      *,
+      doc: feature_lib.DocArg = None,
+  ):
     """Constructs a Text FeatureConnector.
 
     Args:
@@ -40,6 +49,7 @@ class Text(tensor_feature.Tensor):
         text to integers. If None, the text will be utf-8 byte-encoded.
       encoder_config: `tfds.deprecated.text.TextEncoderConfig`, needed if
         restoring from a file with `load_metadata`.
+      doc: Documentation of this feature (e.g. description).
     """
     if encoder and encoder_config:
       raise ValueError("If encoder is provided, encoder_config must be None.")
@@ -63,6 +73,7 @@ class Text(tensor_feature.Tensor):
     super(Text, self).__init__(
         shape=(None,) if has_encoder else (),
         dtype=tf.int64 if has_encoder else tf.string,
+        doc=doc,
     )
 
   @property
@@ -178,19 +189,19 @@ class Text(tensor_feature.Tensor):
     return ex
 
   @classmethod
-  def from_json_content(cls, value: Json) -> "Text":
-    if "use_encoder" in value:
+  def from_json_content(cls, value: Union[Json,
+                                          feature_pb2.TextFeature]) -> "Text":
+    if isinstance(value, dict) and "use_encoder" in value:
       raise ValueError(
           "Deprecated encoder not supported. Please use the plain text version "
           "with `tensorflow_text`.")
-    del value  # Unused
     return cls()
 
-  def to_json_content(self) -> Json:
+  def to_json_content(self) -> Union[Json, feature_pb2.TextFeature]:
     if self._encoder:
       logging.warning(
           "Dataset is using deprecated text encoder API which will be removed "
           "soon. Please use the plain_text version of the dataset and migrate "
           "to `tensorflow_text`.")
       return dict(use_encoder=True)
-    return dict()
+    return feature_pb2.TextFeature()

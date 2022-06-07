@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,13 +17,16 @@
 
 import os
 import tempfile
-from typing import Sequence
+from typing import Sequence, Optional, Union
 
+from etils import epath
 import numpy as np
 import tensorflow as tf
 from tensorflow_datasets.core import utils
+from tensorflow_datasets.core.features import feature as feature_lib
 from tensorflow_datasets.core.features import image_feature
 from tensorflow_datasets.core.features import sequence_feature
+from tensorflow_datasets.core.proto import feature_pb2
 from tensorflow_datasets.core.utils import type_utils
 
 Json = type_utils.Json
@@ -89,11 +92,12 @@ class Video(sequence_feature.Sequence):
 
   def __init__(
       self,
-      shape: Sequence[int],
+      shape: Sequence[Optional[int]],
       encoding_format: str = 'png',
       ffmpeg_extra_args: Sequence[str] = (),
       use_colormap: bool = False,
       dtype=tf.uint8,
+      doc: feature_lib.DocArg = None,
   ):
     """Initializes the connector.
 
@@ -110,6 +114,7 @@ class Video(sequence_feature.Sequence):
         different color.
       dtype: tf.uint16 or tf.uint8 (default). tf.uint16 can be used only with
         png encoding_format
+      doc: Documentation of this feature (e.g. description).
 
     Raises:
       ValueError: If the shape is invalid
@@ -130,7 +135,7 @@ class Video(sequence_feature.Sequence):
     )
 
   def _ffmpeg_decode(self, path_or_fobj):
-    if isinstance(path_or_fobj, type_utils.PathLikeCls):
+    if isinstance(path_or_fobj, epath.PathLikeCls):
       ffmpeg_args = ['-i', os.fspath(path_or_fobj)]
       ffmpeg_stdin = None
     else:
@@ -143,13 +148,13 @@ class Video(sequence_feature.Sequence):
       ffmpeg_args.append(out_pattern)
       utils.ffmpeg_run(ffmpeg_args, ffmpeg_stdin)
       frames = [  # Load all encoded images
-          p.read_bytes() for p in sorted(utils.as_path(ffmpeg_dir).iterdir())
+          p.read_bytes() for p in sorted(epath.Path(ffmpeg_dir).iterdir())
       ]
     return frames
 
   def encode_example(self, video_or_path_or_fobj):
     """Converts the given image into a dict convertible to tf example."""
-    if isinstance(video_or_path_or_fobj, type_utils.PathLikeCls):
+    if isinstance(video_or_path_or_fobj, epath.PathLikeCls):
       video_or_path_or_fobj = os.fspath(video_or_path_or_fobj)
       if not os.path.isfile(video_or_path_or_fobj):
         _, video_temp_path = tempfile.mkstemp()
@@ -174,18 +179,34 @@ class Video(sequence_feature.Sequence):
     return super(Video, self).encode_example(encoded_video)
 
   @classmethod
-  def from_json_content(cls, value: Json) -> 'Video':
-    shape = tuple(value['shape'])
-    encoding_format = value['encoding_format']
-    ffmpeg_extra_args = value['ffmpeg_extra_args']
-    return cls(shape, encoding_format, ffmpeg_extra_args)
+  def from_json_content(
+      cls, value: Union[Json, feature_pb2.VideoFeature]) -> 'Video':
+    if isinstance(value, dict):
+      # For backwards compatibility
+      shape = tuple(value['shape'])
+      encoding_format = value['encoding_format']
+      ffmpeg_extra_args = value['ffmpeg_extra_args']
+      return cls(
+          shape=shape,
+          encoding_format=encoding_format,
+          ffmpeg_extra_args=ffmpeg_extra_args,
+      )
+    return cls(
+        shape=feature_lib.from_shape_proto(value.shape),
+        dtype=feature_lib.parse_dtype(value.dtype),
+        encoding_format=value.encoding_format or None,
+        use_colormap=value.use_colormap,
+        ffmpeg_extra_args=value.ffmpeg_extra_args,
+    )
 
-  def to_json_content(self) -> Json:
-    return {
-        'shape': list(self.shape),
-        'encoding_format': self._encoding_format,
-        'ffmpeg_extra_args': self._extra_ffmpeg_args
-    }
+  def to_json_content(self) -> feature_pb2.VideoFeature:
+    return feature_pb2.VideoFeature(
+        shape=feature_lib.to_shape_proto(self.shape),
+        dtype=feature_lib.encode_dtype(self.dtype),
+        encoding_format=self._encoding_format,
+        use_colormap=self._use_colormap,
+        ffmpeg_extra_args=self._extra_ffmpeg_args,
+    )
 
   def repr_html(self, ex: np.ndarray) -> str:
     """Video are displayed as `<video>`."""

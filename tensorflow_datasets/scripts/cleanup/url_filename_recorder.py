@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 r"""Update checksums to contain filename."""
 
 from concurrent import futures
+import dataclasses
 import itertools
 import typing
 from typing import Dict, NewType, Optional
@@ -23,7 +24,6 @@ import urllib
 
 from absl import app
 from absl import logging
-import dataclasses
 import requests
 import tensorflow_datasets as tfds
 from tensorflow_datasets.core.download import checksums
@@ -36,7 +36,7 @@ Filename = NewType('Filename', Optional[str])
 
 
 def _collect_path_to_url_infos(
-) -> Dict[tfds.core.ReadWritePath, Dict[Url, checksums.UrlInfo]]:
+) -> Dict[tfds.core.Path, Dict[Url, checksums.UrlInfo]]:
   """Collect checksums paths to url_infos."""
   # Collect legacy checksums paths
   url_info_paths = list(checksums._checksum_paths().values())  # pylint: disable=protected-access

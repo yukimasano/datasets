@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ class So2satConfig(tfds.core.BuilderConfig):
             '2.0.0': 'New split API (https://tensorflow.org/datasets/splits)',
             '2.1.0': 'Using updated optical channels calibration factor.',
         },
-        **kwargs,
+        **kwargs,  # pytype: disable=wrong-arg-types  # gen-stub-imports
     )
     self.selection = selection
 

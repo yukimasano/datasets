@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,11 @@ import tensorflow_datasets.public_api as tfds
 class Imagenet2012MultilabelTest(tfds.testing.DatasetBuilderTestCase):
   """Tests for imagenet2012_multilabel dataset."""
   DATASET_CLASS = imagenet2012_multilabel.Imagenet2012Multilabel
-  SPLITS = {'validation': 3}  # Number of fake validation examples
+  SPLITS = {
+      'validation': 3,
+      'imagenet_m': 3
+  }  # Number of fake validation examples
+  OVERLAPPING_SPLITS = ['imagenet_m']
   DL_DOWNLOAD_RESULT = 'human_accuracy_fixed.json'
 
   # If you are calling `download/download_and_extract` with a dict, like:

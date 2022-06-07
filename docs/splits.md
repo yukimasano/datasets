@@ -5,7 +5,7 @@ can be explored in the
 [catalog](https://www.tensorflow.org/datasets/catalog/overview).
 
 In addition of the "official" dataset splits, TFDS allow to select slice(s) of
-split(s) and various combinaison.
+split(s) and various combinations.
 
 ## Slicing API
 
@@ -28,7 +28,7 @@ Split can be:
 *   **Slices**: Slices have the same semantic as
     [python slice notation](https://docs.python.org/3/library/stdtypes.html#common-sequence-operations).
     Slices can be:
-    *   **Absolute** (`'train[123:450]'`, `train[:4000]`): (see note bellow for
+    *   **Absolute** (`'train[123:450]'`, `train[:4000]`): (see note below for
         caveat about read order)
     *   **Percent** (`'train[:75%]'`, `'train[25%:75%]'`): Divide the full data
         into 100 even slices. If the data is not divisible by 100, some percent
@@ -45,7 +45,7 @@ Split can be:
 
 ```python
 # Returns both train and test split separately
-train_ds, test_ds = tfds.load('mnist', split=['train', 'test[50%]'])
+train_ds, test_ds = tfds.load('mnist', split=['train', 'test[:50%]'])
 ```
 
 Note: Due to the shards being
@@ -58,7 +58,8 @@ to understand the order in which TFDS read examples.
 
 ## `tfds.even_splits` & multi-host training
 
-`tfds.even_splits` generates a list of non-overlapping sub-splits of same size.
+`tfds.even_splits` generates a list of non-overlapping sub-splits of the same
+size.
 
 ```python
 # Divide the dataset into 3 even parts, each containing 1/3 of the data
@@ -68,17 +69,26 @@ ds = tfds.load('my_dataset', split=split2)
 ```
 
 This can be particularly useful when training in a distributed setting, where
-each host should receive a slice of the original data. Here is an example with
-jax:
+each host should receive a slice of the original data.
+
+With `Jax`, this can be simplified even further using
+`tfds.split_for_jax_process`:
 
 ```python
-splits = tfds.even_splits('train', n=jax.process_count(), drop_remainder=True)
-# The current `process_index` load only `1 / process_count` of the data.
-ds = tfds.load('my_dataset', split=splits[jax.process_index()])
+split = tfds.split_for_jax_process('train', drop_remainder=True)
+ds = tfds.load('my_dataset', split=split)
 ```
 
-`tfds.even_splits` accepts on any split value as input (e.g.
-`'train[75%:]+test'`)
+`tfds.split_for_jax_process` is a simple alias for:
+
+```python
+# The current `process_index` loads only `1 / process_count` of the data.
+splits = tfds.even_splits('train', n=jax.process_count(), drop_remainder=True)
+split = splits[jax.process_index()]
+```
+
+`tfds.even_splits`, `tfds.split_for_jax_process` accepts on any split value as
+input (e.g. `'train[75%:]+test'`)
 
 ## Slicing and metadata
 
@@ -155,5 +165,5 @@ Similarly, the subsplit API will always select the same `set` of examples,
 regardless of platform, architecture, etc. This mean `set('train[:20%]') ==
 set('train[:10%]') + set('train[10%:20%]')`.
 
-However, the order in which example are read might **not** be deterministic.
+However, the order in which examples are read might **not** be deterministic.
 This depends on other parameters (e.g. whether `shuffle_files=True`).

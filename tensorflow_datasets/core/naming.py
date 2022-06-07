@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,9 +19,21 @@ import dataclasses
 import os
 import re
 import textwrap
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, MutableMapping, Optional, Tuple, Union
 
+from etils import epath
 from tensorflow_datasets.core.utils import py_utils
+
+_DEFAULT_NUM_DIGITS_FOR_SHARDS = 5
+
+_VAR_DATASET = 'DATASET'
+_VAR_SPLIT = 'SPLIT'
+_VAR_SHARD_INDEX = 'SHARD_INDEX'
+_VAR_NUM_SHARDS = 'NUM_SHARDS'
+_VAR_SHARD_X_OF_Y = 'SHARD_X_OF_Y'
+_VAR_FILEFORMAT = 'FILEFORMAT'
+
+DEFAULT_FILENAME_TEMPLATE = '{DATASET}-{SPLIT}.{FILEFORMAT}-{SHARD_X_OF_Y}'
 
 _first_cap_re = re.compile('(.)([A-Z][a-z0-9]+)')
 _all_cap_re = re.compile('([a-z0-9])([A-Z])')
@@ -108,8 +120,7 @@ def parse_builder_name_kwargs(
     **builder_kwargs: Builder kwargs
 
   Returns:
-    ns_name: Dataset namespace, or None
-    ds_name: Dataset name
+    ns_name: DatasetName object for the given dataset name
     builder_kwargs: Builder kwargs (version, config, data_dir,...)
   """
   name, parsed_builder_kwargs = _dataset_name_and_kwargs_from_name_str(name)
@@ -210,35 +221,180 @@ def filename_prefix_for_split(name: str, split: str) -> str:
   return '%s-%s' % (filename_prefix_for_name(name), split)
 
 
-def sharded_filenames(filename_prefix: str, num_shards: int) -> List[str]:
-  """Sharded filenames given prefix and number of shards."""
-  shard_suffix = '%05d-of-%05d'
-  return [
-      '%s-%s' % (filename_prefix, shard_suffix % (i, num_shards))
-      for i in range(num_shards)
-  ]
+def _num_digits_needed(num_shards: Optional[int]) -> int:
+  return max(len(str(num_shards or 0)), _DEFAULT_NUM_DIGITS_FOR_SHARDS)
 
 
-def filepattern_for_dataset_split(dataset_name: str,
-                                  split: str,
-                                  data_dir: str,
-                                  filetype_suffix: Optional[str] = None) -> str:
-  prefix = filename_prefix_for_split(dataset_name, split)
-  if filetype_suffix:
-    prefix += '.%s' % filetype_suffix
-  filepath = os.path.join(data_dir, prefix)
-  return '%s*' % filepath
+def _replace_shard_suffix(filepath: str, replacement: str) -> str:
+  """Replaces the shard suffix (must be at the end) with the given string."""
+  (new_string, num_subs) = re.subn(
+      pattern=r'^(.+?)-?\d{5,}(-of-\d{5,})?$',
+      repl=rf'\g<1>{replacement}',
+      string=filepath)
+  if num_subs != 1:
+    raise RuntimeError(
+        f'Should do 1 shard suffix substitution, but did {num_subs}! '
+        f'Filepath was {filepath}')
+  return new_string
+
+
+@dataclasses.dataclass()
+class ShardedFileTemplate:
+  """Template to produce filenames for sharded datasets.
+
+  Attributes:
+    data_dir: the directory that contains the files for the shards.
+    template: template of the sharded files, e.g.
+      '${SPLIT}/data.${FILEFORMAT}-${SHARD_INDEX}'.
+    dataset_name: the name of the dataset.
+    split: the split of the dataset.
+    filetype_suffix: the filetype suffix to denote the type of file. For
+      example, `tfrecord`.
+  """
+  data_dir: epath.Path
+  template: str = DEFAULT_FILENAME_TEMPLATE
+  dataset_name: Optional[str] = None
+  split: Optional[str] = None
+  filetype_suffix: Optional[str] = None
+
+  def __post_init__(self):
+    self.data_dir = epath.Path(self.data_dir)
+    if self.split is not None and not self.split:
+      raise ValueError(f'Split must be a non-empty string: {self}')
+    if self.filetype_suffix is not None and not self.filetype_suffix:
+      raise ValueError(f'Filetype suffix must be a non-empty string: {self}')
+    if not self.template:
+      self.template = DEFAULT_FILENAME_TEMPLATE
+
+  def _default_mappings(self) -> MutableMapping[str, Any]:
+    mappings = {}
+    if self.split:
+      mappings[_VAR_SPLIT] = self.split
+    if self.dataset_name:
+      mappings[_VAR_DATASET] = self.dataset_name
+    if self.filetype_suffix:
+      mappings[_VAR_FILEFORMAT] = self.filetype_suffix
+    return mappings
+
+  def _relative_filepath(
+      self,
+      *,
+      shard_index: int,
+      num_shards: Optional[int],
+  ) -> str:
+    """Returns the path (relative to the data dir) of the shard."""
+    mappings = self._default_mappings()
+
+    # Add shard related information that is formatted consistently
+    shard_number_template = '{n:0%d}' % _num_digits_needed(num_shards)
+    mappings[_VAR_SHARD_INDEX] = shard_number_template.format(n=shard_index)
+    if num_shards:
+      mappings[_VAR_NUM_SHARDS] = shard_number_template.format(n=num_shards)
+      mappings[_VAR_SHARD_X_OF_Y] = (f'{mappings[_VAR_SHARD_INDEX]}'
+                                     f'-of-{mappings[_VAR_NUM_SHARDS]}')
+    return self.template.format(**mappings)
+
+  def sharded_filepath(
+      self,
+      *,
+      shard_index: int,
+      num_shards: Optional[int],
+  ) -> epath.Path:
+    """Returns the filename (including full path if `data_dir` is set) for the given shard."""
+    return self.data_dir / self._relative_filepath(
+        shard_index=shard_index, num_shards=num_shards)
+
+  def sharded_filepaths(
+      self,
+      num_shards: int,
+  ) -> List[epath.Path]:
+    return [
+        self.sharded_filepath(shard_index=i, num_shards=num_shards)
+        for i in range(num_shards)
+    ]
+
+  def filepath_prefix(self,) -> str:
+    a_filepath = self.sharded_filepath(shard_index=0, num_shards=1)
+    return _replace_shard_suffix(os.fspath(a_filepath), '')
+
+  def sharded_filepaths_pattern(
+      self,
+      *,
+      num_shards: Optional[int] = None,
+  ) -> str:
+    """Returns a pattern describing all the file paths captured by this template.
+
+    If `num_shards` is given, then it returns
+    '/path/dataset_name-split.fileformat@num_shards`.
+    If `num_shards` is not given, then it returns
+    '/path/dataset_name-split.fileformat*`.
+
+    Args:
+      num_shards: optional specification of the number of shards.
+
+    Returns:
+      the pattern describing all shards captured by this template.
+    """
+    a_filepath = self.sharded_filepath(shard_index=0, num_shards=1)
+    if num_shards:
+      replacement = f'@{num_shards}'
+    else:
+      replacement = '*'
+    return _replace_shard_suffix(os.fspath(a_filepath), replacement)
+
+  def sharded_filenames(self, num_shards: int) -> List[str]:
+    return [path.name for path in self.sharded_filepaths(num_shards=num_shards)]
+
+  def replace(self, **kwargs: Any) -> 'ShardedFileTemplate':
+    """Returns a copy of the `ShardedFileTemplate` with updated attributes."""
+    return dataclasses.replace(self, **kwargs)
+
+
+def filepattern_for_dataset_split(
+    *,
+    dataset_name: str,
+    split: str,
+    data_dir: str,
+    filetype_suffix: Optional[str] = None,
+    num_shards: Optional[int] = None,
+) -> str:
+  """Returns the file pattern for the given dataset.
+
+  TODO(tfds): remove this by start using ShardedFileTemplate
+
+  Args:
+    dataset_name: Name of the dataset
+    split: Name of the requested split
+    data_dir: The base folder that contains the dataset.
+    filetype_suffix: Optional suffix, e.g. tfrecord
+    num_shards: Optional argument. If specified, will return file@num_shards
+      notation, otherwise file*.
+  """
+  template = ShardedFileTemplate(
+      data_dir=epath.Path(data_dir),
+      dataset_name=dataset_name,
+      split=split,
+      filetype_suffix=filetype_suffix)
+  return os.fspath(template.sharded_filepaths_pattern(num_shards=num_shards))
 
 
 def filenames_for_dataset_split(
     dataset_name: str,
     split: str,
     num_shards: int,
-    filetype_suffix: Optional[str] = None) -> List[str]:
-  prefix = filename_prefix_for_split(dataset_name, split)
-  if filetype_suffix:
-    prefix += '.%s' % filetype_suffix
-  return sharded_filenames(prefix, num_shards)
+    filetype_suffix: str,
+    data_dir: Optional[epath.PathLike] = None,
+) -> List[str]:
+  """Returns the list of filenames for the given dataset and split."""
+  # TODO(tfds): remove this by start using ShardedFileTemplate
+  template = ShardedFileTemplate(
+      dataset_name=dataset_name,
+      split=split,
+      filetype_suffix=filetype_suffix,
+      data_dir=epath.Path(data_dir))
+  return [
+      os.fspath(fp) for fp in template.sharded_filenames(num_shards=num_shards)
+  ]
 
 
 def filepaths_for_dataset_split(
@@ -246,16 +402,18 @@ def filepaths_for_dataset_split(
     split: str,
     num_shards: int,
     data_dir: str,
-    filetype_suffix: Optional[str] = None) -> List[str]:
+    filetype_suffix: str,
+) -> List[str]:
   """File paths of a given dataset split."""
-  filenames = filenames_for_dataset_split(
+  # TODO(tfds): remove this by start using ShardedFileTemplate
+  template = ShardedFileTemplate(
       dataset_name=dataset_name,
       split=split,
-      num_shards=num_shards,
       filetype_suffix=filetype_suffix,
-  )
-  filepaths = [os.path.join(data_dir, fname) for fname in filenames]
-  return filepaths
+      data_dir=epath.Path(data_dir))
+  return [
+      os.fspath(fp) for fp in template.sharded_filepaths(num_shards=num_shards)
+  ]
 
 
 @dataclasses.dataclass(eq=True, frozen=True)
@@ -278,6 +436,8 @@ class FilenameInfo:
   @classmethod
   def from_str(cls, filename: str) -> 'FilenameInfo':
     """Factory to create a `FilenameInfo` from filename."""
+    # Strip of the directory if the filename contains it.
+    filename = os.path.basename(filename)
     match = _parse_filename(filename)
     if not match:  # No match found
       raise ValueError(
@@ -298,13 +458,17 @@ class FilenameInfo:
     return bool(_parse_filename(filename))
 
   def __str__(self) -> str:
-    return (f'{self.dataset_name}-{self.split}.{self.filetype_suffix}-'
-            f'{self.shard_index:05}-of-{self.num_shards:05}')
+    # Note: It's possible for `shard_index` and `num_shards` to exceed 5 digits,
+    # e.g., "000123-of-654321", "123456-of-654321".
+    num_digits = max(5, len(str(self.num_shards)))
+    return (
+        f'{self.dataset_name}-{self.split}.{self.filetype_suffix}-'
+        f'{self.shard_index:0{num_digits}}-of-{self.num_shards:0{num_digits}}')
 
 
-def _parse_filename(filename: str) -> Optional['re.Match']:  # pytype: disable=module-attr
+def _parse_filename(filename: str) -> Optional['re.Match']:
   """Parse the tf-record filename."""
-  pattern = (rf'(?P<dataset_name>{_NAME_CLASS})-(?P<split>\w+)\.'
+  pattern = (rf'(?P<dataset_name>{_NAME_CLASS})-(?P<split>(\w|-)+)\.'
              r'(?P<filetype_suffix>\w+)-'
-             r'(?P<shard_index>\d\d\d\d\d)-of-(?P<num_shards>\d\d\d\d\d)')
+             r'(?P<shard_index>\d{5,})-of-(?P<num_shards>\d{5,})')
   return re.fullmatch(pattern, filename)

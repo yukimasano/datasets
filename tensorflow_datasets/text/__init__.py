@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@
 
 from tensorflow_datasets.text.ag_news_subset import AGNewsSubset
 from tensorflow_datasets.text.anli import Anli
+from tensorflow_datasets.text.assin2 import Assin2
+from tensorflow_datasets.text.beir import Beir
 from tensorflow_datasets.text.blimp import Blimp
 from tensorflow_datasets.text.bool_q import BoolQ
 from tensorflow_datasets.text.c4 import C4
@@ -36,6 +38,7 @@ from tensorflow_datasets.text.gem import Gem
 from tensorflow_datasets.text.glue import Glue
 from tensorflow_datasets.text.goemotions import Goemotions
 from tensorflow_datasets.text.gpt3 import Gpt3
+from tensorflow_datasets.text.gsm8k import Gsm8k
 from tensorflow_datasets.text.hellaswag import Hellaswag
 from tensorflow_datasets.text.imdb import IMDBReviews
 from tensorflow_datasets.text.irc_disentanglement import IrcDisentanglement
@@ -43,7 +46,9 @@ from tensorflow_datasets.text.lambada import Lambada
 from tensorflow_datasets.text.librispeech_lm import LibrispeechLm
 from tensorflow_datasets.text.lm1b import Lm1b
 from tensorflow_datasets.text.math_dataset import MathDataset
+from tensorflow_datasets.text.math_qa import MathQa
 from tensorflow_datasets.text.movie_rationales import MovieRationales
+from tensorflow_datasets.text.mrqa import MRQA
 from tensorflow_datasets.text.multi_nli import MultiNLI
 from tensorflow_datasets.text.multi_nli_mismatch import MultiNLIMismatch
 from tensorflow_datasets.text.openbookqa import Openbookqa
@@ -53,6 +58,7 @@ from tensorflow_datasets.text.pg19 import Pg19
 from tensorflow_datasets.text.piqa import PIQA
 from tensorflow_datasets.text.qa4mre import Qa4mre
 from tensorflow_datasets.text.quac import Quac
+from tensorflow_datasets.text.quality import Quality
 from tensorflow_datasets.text.race import Race
 from tensorflow_datasets.text.reddit_disentanglement import RedditDisentanglement
 from tensorflow_datasets.text.salient_span_wikipedia import SalientSpanWikipedia
@@ -61,14 +67,19 @@ from tensorflow_datasets.text.scan import Scan
 from tensorflow_datasets.text.scan import ScanConfig
 from tensorflow_datasets.text.schema_guided_dialogue import SchemaGuidedDialogue
 from tensorflow_datasets.text.scicite import Scicite
+from tensorflow_datasets.text.scitail import SciTail
+from tensorflow_datasets.text.scrolls import Scrolls
 from tensorflow_datasets.text.sentiment140 import Sentiment140
 from tensorflow_datasets.text.snli import Snli
+from tensorflow_datasets.text.squad_question_generation import SquadQuestionGeneration
 from tensorflow_datasets.text.star_cfq import StarCFQ
 from tensorflow_datasets.text.story_cloze import StoryCloze
 from tensorflow_datasets.text.super_glue import SuperGlue
 from tensorflow_datasets.text.tiny_shakespeare import TinyShakespeare
 from tensorflow_datasets.text.trec import Trec
+from tensorflow_datasets.text.unifiedqa import UnifiedQA
 from tensorflow_datasets.text.wiki40b import Wiki40b
+from tensorflow_datasets.text.wiki_dialog import WikiDialog
 from tensorflow_datasets.text.wikiann import Wikiann
 from tensorflow_datasets.text.wikipedia import Wikipedia
 from tensorflow_datasets.text.wikipedia_toxicity_subtypes import WikipediaToxicitySubtypes

@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,8 @@
 
 """FeatureDict: Main feature connector container."""
 
-from typing import Dict
+import concurrent.futures
+from typing import Dict, List, Union
 
 import tensorflow as tf
 
@@ -23,9 +24,12 @@ from tensorflow_datasets.core import utils
 from tensorflow_datasets.core.features import feature as feature_lib
 from tensorflow_datasets.core.features import tensor_feature
 from tensorflow_datasets.core.features import top_level_feature
+from tensorflow_datasets.core.proto import feature_pb2
+from tensorflow_datasets.core.utils import py_utils
 from tensorflow_datasets.core.utils import type_utils
 
 Json = type_utils.Json
+WORKER_COUNT = 16
 
 
 class _DictGetCounter(object):
@@ -108,7 +112,12 @@ class FeaturesDict(top_level_feature.TopLevelFeature):
 
   """
 
-  def __init__(self, feature_dict: Dict[str, feature_lib.FeatureConnectorArg]):
+  def __init__(
+      self,
+      feature_dict: Dict[str, feature_lib.FeatureConnectorArg],
+      *,
+      doc: feature_lib.DocArg = None,
+  ):
     """Initialize the features.
 
     Args:
@@ -116,11 +125,12 @@ class FeaturesDict(top_level_feature.TopLevelFeature):
         example. The keys should correspond to the data dict as returned by
         tf.data.Dataset(). Types (tf.int32,...) and dicts will automatically be
         converted into FeatureConnector.
+      doc: Documentation of this feature (e.g. description).
 
     Raises:
       ValueError: If one of the given features is not recognized
     """
-    super(FeaturesDict, self).__init__()
+    super(FeaturesDict, self).__init__(doc=doc)
     self._feature_dict = {k: to_feature(v) for k, v in feature_dict.items()}
 
   # Dict functions.
@@ -161,6 +171,27 @@ class FeaturesDict(top_level_feature.TopLevelFeature):
     lines.append('})')
     return '\n'.join(lines)
 
+  def catalog_documentation(
+      self) -> List[feature_lib.CatalogFeatureDocumentation]:
+    feature_docs = [
+        feature_lib.CatalogFeatureDocumentation(
+            name='',
+            cls_name=type(self).__name__,
+            tensor_info=None,
+            description=self._doc.desc,
+            value_range=self._doc.value_range,
+        )
+    ]
+    for feature_name, feature in sorted(list(self._feature_dict.items())):
+      for documentation in feature.catalog_documentation():
+        if documentation.name:
+          nested_name = f'{feature_name}/{documentation.name}'
+        else:
+          nested_name = feature_name
+        feature_docs.append(documentation.replace(name=nested_name))
+    return feature_docs
+
+  @py_utils.memoize()
   def get_tensor_info(self):
     """See base class for details."""
     return {
@@ -168,6 +199,7 @@ class FeaturesDict(top_level_feature.TopLevelFeature):
         for feature_key, feature in self._feature_dict.items()
     }
 
+  @py_utils.memoize()
   def get_serialized_info(self):
     """See base class for details."""
     return {
@@ -176,16 +208,26 @@ class FeaturesDict(top_level_feature.TopLevelFeature):
     }
 
   @classmethod
-  def from_json_content(cls, value: Json) -> 'FeaturesDict':
-    return cls({
-        k: feature_lib.FeatureConnector.from_json(v) for k, v in value.items()
-    })
+  def from_json_content(
+      cls, value: Union[Json, feature_pb2.FeaturesDict]) -> 'FeaturesDict':
+    if isinstance(value, dict):
+      features = {
+          k: feature_lib.FeatureConnector.from_json(v)
+          for k, v in value.items()
+      }
+    else:
+      features = {
+          name: feature_lib.FeatureConnector.from_proto(proto)
+          for name, proto in value.features.items()
+      }
+    return cls(features)
 
-  def to_json_content(self) -> Json:
-    return {
-        feature_key: feature.to_json()
-        for feature_key, feature in self._feature_dict.items()
-    }
+  def to_json_content(self) -> feature_pb2.FeaturesDict:
+    return feature_pb2.FeaturesDict(
+        features={
+            feature_key: feature.to_proto()
+            for feature_key, feature in self._feature_dict.items()
+        },)
 
   def encode_example(self, example_dict):
     """See base class for details."""
@@ -245,12 +287,18 @@ class FeaturesDict(top_level_feature.TopLevelFeature):
 
   def load_metadata(self, data_dir, feature_name=None):
     """See base class for details."""
-    # Recursively load all child features
-    for feature_key, feature in self._feature_dict.items():
+
+    # Load all child features asynchronously
+    def load_metadata(feature_item):
+      feature_key, feature = feature_item
       feature_key = feature_key.replace('/', '.')
       if feature_name:
         feature_key = '-'.join((feature_name, feature_key))
       feature.load_metadata(data_dir, feature_name=feature_key)
+
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=WORKER_COUNT) as executor:
+      executor.map(load_metadata, self._feature_dict.items())
 
 
 def to_feature(value: feature_lib.FeatureConnectorArg):

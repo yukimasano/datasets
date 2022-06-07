@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,6 +26,14 @@ def _mujoco_replay_datasets():
   }
 
 
+def _mujoco_v1_replay_datasets():
+  """Set of v1 Mujoco datasets with replay."""
+  return {
+      'v1-medium-replay',
+      'v1-full-replay',
+  }
+
+
 def _mujoco_full_metadata_datasets():
   """Set of Mujoco datasets that contain all of the metadata fields."""
   return {'v1-expert', 'v2-expert', 'v1-medium', 'v2-medium'}
@@ -35,7 +43,7 @@ class MujocoDatasetTest(tf.test.TestCase):
 
   def test_builder_config_step_metadata(self):
     for config in dataset_builder.MUJOCO_BUILDER_CONFIGS:
-      if config.name in _mujoco_replay_datasets():
+      if config.name in _mujoco_v1_replay_datasets():
         self.assertEqual(config.float_type, tf.float64)
       else:
         self.assertEqual(config.float_type, tf.float32)

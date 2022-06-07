@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -134,7 +134,7 @@ class Robonet(tfds.core.BeamBasedBuilder):
             tfds.features.Video(
                 video_shape,
                 ffmpeg_extra_args=ffmpeg_extra_args,
-                encoding_format='png'),
+                encoding_format='png'),  # pytype: disable=wrong-arg-types  # gen-stub-imports
         # Robot actions: float32, [None, ACTIONS_DIM]
         'actions':
             tfds.features.Tensor(shape=(None, ACTIONS_DIM), dtype=tf.float32),

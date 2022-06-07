@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ stored in metadata.csv which contains
 (book_id, short_book_title, publication_date, book_link).
 """
 
-_DATA_DIR = tfds.core.as_path('gs://deepmind-gutenberg')
+_DATA_DIR = tfds.core.Path('gs://deepmind-gutenberg')
 
 
 class Pg19(tfds.core.GeneratorBasedBuilder):

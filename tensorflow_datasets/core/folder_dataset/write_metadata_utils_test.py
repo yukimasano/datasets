@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,11 +17,11 @@
 
 import pathlib
 
+from etils import epath
 import pytest
 from tensorflow_datasets import testing
 from tensorflow_datasets.core import naming
 from tensorflow_datasets.core import read_only_builder
-from tensorflow_datasets.core import utils
 from tensorflow_datasets.core.folder_dataset import write_metadata_utils
 
 
@@ -35,7 +35,7 @@ def test_write_metadata(
     tmp_path: pathlib.Path,
     file_format,
 ):
-  tmp_path = utils.as_path(tmp_path)
+  tmp_path = epath.Path(tmp_path)
 
   src_builder = testing.DummyDataset(
       data_dir=tmp_path / 'origin',

@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import types
 from typing import Iterator, NamedTuple, Optional, Union
 from unittest import mock
 
+from etils import epath
 import tensorflow as tf
 from tensorflow_datasets.core import dataset_builder
 from tensorflow_datasets.core import dataset_info
@@ -159,7 +160,9 @@ def _make_scalar_feature(dtype: str) -> tf.dtypes.DType:
   """Returns the `tf.dtype` scalar feature."""
   str2val = {
       'bool_': tf.bool,
-      'string': tf.string,
+      'float': tf.float32,
+      'double': tf.float64,
+      'large_string': tf.string,
       'utf8': tf.string,
   }
   if dtype in str2val:
@@ -287,7 +290,7 @@ def _new_open(*args, encoding=None, **kwargs):
 def _new_pathlib_path_new(cls, *args):
   """Mocked `pathlib.Path.__new__`."""
   del cls
-  return utils.as_path(*args)
+  return epath.Path(*args)
 
 
 @contextlib.contextmanager

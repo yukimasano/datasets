@@ -105,7 +105,9 @@ class MyDataset(tfds.core.GeneratorBasedBuilder):
         builder=self,
         features=tfds.features.FeaturesDict({
             'image': tfds.features.Image(shape=(256, 256, 3)),
-            'label': tfds.features.ClassLabel(names=['no', 'yes']),
+            'label': tfds.features.ClassLabel(
+                names=['no', 'yes'],
+                doc='Whether this is a picture of a cat'),
         }),
     )
 
@@ -223,7 +225,8 @@ Most datasets need to download data from the web. This is done using the
 *   `download_and_extract`: Same as
     `dl_manager.extract(dl_manager.download(urls))`
 
-All those methods returns `tfds.core.ReadOnlyPath`, which are
+All those methods returns `tfds.core.Path` (aliases for
+[`epath.Path`](https://github.com/google/etils)), which are
 [pathlib.Path-like](https://docs.python.org/3/library/pathlib.html) objects.
 
 Those methods supports arbitrary nested structure (`list`, `dict`), like:
@@ -469,7 +472,7 @@ Version can refer to two different meaning:
 To update a dataset:
 
 *   For "external" data update: Multiple users may want to access a specific
-    year/version simlutaneously. This is done by using one
+    year/version simultaneously. This is done by using one
     `tfds.core.BuilderConfig` per version (e.g. `coco/2017`, `coco/2019`) or one
     class per version (e.g. `Voc2007`, `Voc2012`).
 *   For "internal" code update: Users only download the most recent version. Any
@@ -508,7 +511,7 @@ cd path/to/datasets/my_dataset/
 tfds build --register_checksums
 ```
 
-Some useful flags for developpement:
+Some useful flags for development:
 
 *   `--pdb`: Enter debugging mode if an exception is raised.
 *   `--overwrite`: Delete existing files if the dataset was already generated.
@@ -563,7 +566,7 @@ class MyDatasetTest(tfds.testing.DatasetBuilderTestCase):
   # then the tests needs to provide the fake output paths relative to the
   # fake data directory
   DL_EXTRACT_RESULT = {
-      'name1': 'path/to/file1',  # Relative to dummy_data/my_dataset dir.
+      'name1': 'path/to/file1',  # Relative to my_dataset/dummy_data dir.
       'name2': 'file2',
   }
 

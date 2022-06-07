@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 import collections
 import pathlib
 
+from etils import epath
 import pytest
 
 import tensorflow as tf
@@ -316,7 +317,7 @@ def test_basename_from_url(url: str, filename: str):
 
 
 def test_incomplete_file(tmp_path: pathlib.Path):
-  tmp_path = utils.as_path(tmp_path)
+  tmp_path = epath.Path(tmp_path)
   filepath = tmp_path / 'test.txt'
   with py_utils.incomplete_file(filepath) as tmp_filepath:
     tmp_filepath.write_text('content')

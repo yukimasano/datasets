@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ from tensorflow_datasets.scripts.documentation import doc_utils
 
 
 def test_build_catalog(tmp_path: pathlib.Path):
-  """Tests that build_catalog correctly generate the index."""
+  """Tests that build_catalog correctly generates the index."""
   build_catalog.build_catalog(
       datasets=['mnist', 'coco'],
       catalog_dir=tmp_path,

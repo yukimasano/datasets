@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -93,16 +93,23 @@ def _load_builder(name: str,) -> Optional[BuilderToDocument]:
 
 def _load_builder_from_location(name: str,) -> Optional[BuilderToDocument]:
   """Load the builder, config,... to document."""
-  namespace = tfds.core.utils.DatasetName(name).namespace
+  dataset_name = tfds.core.utils.DatasetName(name)
+  logging.info(f'Loading builder {dataset_name} from location')
   try:
     builder = tfds.builder(name)
-  except tfds.core.DatasetNotFoundError:
+    logging.debug(f'Loaded builder from location: {builder}')
+  except tfds.core.DatasetNotFoundError as e:
+    logging.info(
+        f'Dataset {dataset_name} not found, will now try to load from sub-folder',
+        exc_info=e)
     # If tfds.core.DatasetNotFoundError, it might be the default
-    # config isn't found. Should try to load a sub-folder (to check ).
+    # config isn't found. Should try to load a sub-folder (to check).
     builder = _maybe_load_config(name)
     if not builder:
-      return builder
-  except tf.errors.PermissionDeniedError:
+      logging.error(f'Dataset {dataset_name} not found', exc_info=e)
+      return None
+  except (OSError, tf.errors.PermissionDeniedError) as e:
+    logging.error(f'Permission denied for {dataset_name}', exc_info=e)
     tqdm.tqdm.write(f'Warning: Skip dataset {name} due to permission error')
     return None
   except Exception as e:  # pylint: disable=broad-except
@@ -113,8 +120,8 @@ def _load_builder_from_location(name: str,) -> Optional[BuilderToDocument]:
   else:
     config_builders = []
   return BuilderToDocument(
-      section=namespace,
-      namespace=namespace,
+      section=dataset_name.namespace,
+      namespace=dataset_name.namespace,
       builder=builder,
       config_builders=config_builders,
   )
@@ -138,9 +145,14 @@ def _load_all_configs(
     if path.name in filtered_dirs:
       return None  # Default config is already loaded
     try:
-      return tfds.builder(f'{name}/{path.name}')
+      builder_conf = tfds.builder(f'{name}/{path.name}')
     except tfds.core.DatasetNotFoundError:
       return None
+    if not builder_conf.builder_config:
+      # Unexpected sub-config with wrong metadata.
+      # This can happen if the user manually messed up with the directories.
+      return None
+    return builder_conf
 
   with futures.ThreadPoolExecutor(max_workers=_WORKER_COUNT_CONFIGS) as tpool:
     config_names = sorted(common_dir.iterdir())
@@ -208,6 +220,8 @@ def _document_single_builder_inner(
   tqdm.tqdm.write(f'Document builder {name}...')
   doc_info = _load_builder(name)
   if doc_info is None:
+    logging.warn(
+        f'No doc info was found for document builder {name}. Skipping.')
     return None
 
   out_str = dataset_markdown_builder.get_markdown_string(
@@ -241,7 +255,7 @@ def iter_documentation_builders(
     *,
     doc_util_paths: Optional[doc_utils.DocUtilPaths] = None,
 ) -> Iterator[BuilderDocumentation]:
-  """Create dataset documentation string for given datasets.
+  """Creates dataset documentation string for given datasets.
 
   Args:
     datasets: list of datasets for which to create documentation. If None, then

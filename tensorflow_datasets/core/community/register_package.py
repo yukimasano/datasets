@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 """Source-based register."""
 
 import collections
+import dataclasses
 import datetime
 import hashlib
 import json
@@ -24,8 +25,7 @@ from typing import Any, List, Optional, Type
 
 from absl import logging
 
-import dataclasses
-
+from etils import epath
 from tensorflow_datasets.core import dataset_builder
 from tensorflow_datasets.core import registered
 from tensorflow_datasets.core import utils
@@ -49,7 +49,7 @@ class DatasetPackage:
 
   Attributes:
     name: Dataset name
-    source: Source to locate of the source code (e.g. `github://...`)
+    source: Source that contains the source code (e.g. `github://...`)
   """
   name: utils.DatasetName
   source: dataset_sources_lib.DatasetSource
@@ -60,7 +60,7 @@ class DatasetPackage:
   def from_json(cls, data: utils.Json) -> 'DatasetPackage':
     """Factory which creates the cls from json."""
     return cls(
-        name=utils.DatasetName(data['name']),
+        name=utils.DatasetName(namespace_name=data['name']),
         source=dataset_sources_lib.DatasetSource.from_json(data['source']),
     )
 
@@ -95,7 +95,7 @@ class _InstalledPackage:
     return f'{_IMPORT_MODULE_NAME}.{name.namespace}.{name.name}.{self.hash}.{name.name}'
 
   @property
-  def installation_path(self) -> utils.ReadWritePath:
+  def installation_path(self) -> epath.Path:
     """Local path of the package."""
     name = self.package.name
     sub_dir = f'{_IMPORT_MODULE_NAME}/{name.namespace}/{name.name}/{self.hash}'
@@ -141,7 +141,7 @@ class _PackageIndex(collections.UserDict):
 
   """
 
-  def __init__(self, path: utils.PathLike):
+  def __init__(self, path: epath.PathLike):
     """Contructor.
 
     Args:
@@ -149,8 +149,8 @@ class _PackageIndex(collections.UserDict):
         dataset packages)
     """
     super().__init__()
-    self._remote_path: utils.ReadOnlyPath = utils.as_path(path)
-    self._cached_path: utils.ReadOnlyPath = (
+    self._remote_path: epath.Path = epath.Path(path)
+    self._cached_path: epath.Path = (
         cache.cache_path() / 'community-datasets-list.jsonl')
 
     # Pre-load the index from the cache
@@ -183,7 +183,7 @@ class _PackageIndex(collections.UserDict):
       return
 
     # If read was sucessful, update the cache with the new dataset list
-    self._cached_path.write_text(content)
+    self._cached_path.write_text(content)  # pytype: disable=attribute-error  # attribute-variable-annotations
     self._refresh_from_content(content)
 
 
@@ -210,14 +210,14 @@ class PackageRegister(register_base.BaseRegister):
 
   """
 
-  def __init__(self, path: utils.PathLike):
+  def __init__(self, path: epath.PathLike):
     """Contructor.
 
     Args:
       path: Path to the register files containing the list of dataset sources,
         forwarded to `_PackageIndex`
     """
-    self._path = utils.as_path(path)
+    self._path = path
 
   @utils.memoized_property
   def _package_index(self) -> _PackageIndex:
@@ -254,6 +254,93 @@ class PackageRegister(register_base.BaseRegister):
   ) -> dataset_builder.DatasetBuilder:
     """Returns the dataset builder."""
     return self.builder_cls(name)(**builder_kwargs)  # pytype: disable=not-instantiable
+
+
+def list_ds_packages_for_namespace(
+    namespace: str,
+    path: epath.Path,
+) -> List[DatasetPackage]:
+  """Returns the dataset names found in a specific directory.
+
+  Directories that contain code should have the following structure:
+
+  ```
+  <path>/
+      <dataset0>/
+          <dataset0>.py
+      <dataset1>/
+          <dataset1>.py
+      ...
+  ```
+
+  Additional files or folders which are not detected as datasets will be
+  ignored (e.g. `__init__.py`).
+
+  Args:
+    namespace: Namespace of the datasets
+    path: The directory path containing the datasets.
+
+  Returns:
+    ds_packages: The dataset packages found in the directory (sorted for
+      determinism).
+
+  Raises:
+    FileNotFoundError: If the path cannot be reached.
+  """
+  if not path.exists():
+    # Should be fault-tolerant in the future
+    raise FileNotFoundError(f'Could not find datasets at {path}')
+
+  all_packages = []
+  for ds_path in path.iterdir():
+    source = get_dataset_source(ds_path)
+    if source:
+      pkg = DatasetPackage(
+          name=utils.DatasetName(namespace=namespace, name=ds_path.name),
+          source=source,
+      )
+      all_packages.append(pkg)
+
+  return all_packages
+
+
+def get_dataset_source(
+    ds_path: epath.Path,) -> Optional[dataset_sources_lib.DatasetSource]:
+  """Returns a `DatasetSource` instance if the given path corresponds to a dataset.
+
+  To determine whether the given path contains a dataset, a simple heuristic is
+  used that checks whether the path has the following structure:
+
+  ```
+  <ds_name>/
+      <ds_name>.py
+  ```
+
+  If so, all `.py`, `.txt`, `.tsv`, `.json` files will be added to the package.
+
+  Args:
+    ds_path: Path of the dataset module
+
+  Returns:
+    A `DatasetSource` instance if the path matches the expected file structure.
+  """
+  filter_list = {'__init__.py'}
+  suffixes_list = ('.txt', '.tsv', '.py', '.json')
+
+  def is_interesting_file(fname: str) -> bool:
+    return fname.endswith(suffixes_list) and fname not in filter_list
+
+  if not ds_path.is_dir():
+    return None
+  all_filenames = set(f.name for f in ds_path.iterdir())
+  if f'{ds_path.name}.py' not in all_filenames:
+    return None
+
+  return dataset_sources_lib.DatasetSource(
+      root_path=ds_path,
+      filenames=sorted(
+          [fname for fname in all_filenames if is_interesting_file(fname)]),
+  )
 
 
 def _download_or_reuse_cache(
@@ -343,7 +430,7 @@ def _download_and_cache(package: DatasetPackage) -> _InstalledPackage:
   Returns:
     installed_dataset: The installed dataset package.
   """
-  tmp_dir = utils.as_path(tempfile.mkdtemp())
+  tmp_dir = epath.Path(tempfile.mkdtemp())
   try:
     # Download the package in a tmp directory
     dataset_sources_lib.download_from_source(
@@ -379,7 +466,7 @@ def _download_and_cache(package: DatasetPackage) -> _InstalledPackage:
   return installed_package
 
 
-def _compute_dir_hash(path: utils.ReadOnlyPath) -> str:
+def _compute_dir_hash(path: epath.Path) -> str:
   """Computes the checksums of the given directory deterministically."""
   all_files = sorted(path.iterdir())
 
@@ -390,7 +477,3 @@ def _compute_dir_hash(path: utils.ReadOnlyPath) -> str:
   all_checksums = [f.name for f in all_files]
   all_checksums += [checksums.compute_url_info(f).checksum for f in all_files]
   return hashlib.sha256(''.join(all_checksums).encode()).hexdigest()
-
-
-# Register pointing to the GCS community list.
-community_register = PackageRegister(path=gcs_utils.GCS_COMMUNITY_INDEX_PATH)

@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -79,7 +79,10 @@ def test_mocking_add_tfds_id():
       'image': tf.TensorSpec(shape=(28, 28, 1), dtype=tf.uint8),
       'label': tf.TensorSpec(shape=(), dtype=tf.int64),
   }
-  list(ds.take(3))  # Iteration should work
+  train_examples = list(ds.take(3))  # Iteration should work
+  ds = tfds.load('mnist', split='test', read_config=read_config)
+  test_examples = list(ds.take(3))  # Iteration should work
+  assert train_examples[0]['tfds_id'] != test_examples[0]['tfds_id']
 
 
 @pytest.mark.usefixtures('apply_mock_data')
@@ -250,19 +253,18 @@ def test_mock_non_registered_datasets(
     assert len(list(ds)) == 15
 
 
-def test_mocking_rlu_nested_dataset(mock_data):
+def test_mocking_rlu_nested_dataset():
   """Test of a nested dataset.
 
   In this test we use the dataset rlu_atari.
   The dataset has the following features:
 
     features=tfds.features.FeaturesDict({
-      'clipped_episode_return': tf.float32,
       'episode_id': tf.int64,
+      'checkpoint_id': tf.int64,
       'episode_return': tf.float32,
       'steps': tfds.features.Dataset({
           'action': tf.int64,
-          'clipped_reward': tf.float32,
           'discount': tf.float32,
           'is_first': tf.bool,
           'is_last': tf.bool,
@@ -271,11 +273,9 @@ def test_mocking_rlu_nested_dataset(mock_data):
           'reward': tf.float32,
       }),
     })
-
-  Args:
-    mock_data: the stream of mock data points.
   """
-  with mock_data(num_examples=3):
+  with tfds.testing.mock_data(
+      num_examples=3, policy=tfds.testing.MockPolicy.USE_CODE):
     ds = tfds.load('rlu_atari/Pong_run_1', split='train')
 
     steps = ds.element_spec['steps']
@@ -290,7 +290,63 @@ def test_mocking_rlu_nested_dataset(mock_data):
       ds_steps_iter = iter(ds_steps)
       steps_ex = next(ds_steps_iter)
       assert set(steps_ex.keys()) == {
-          'action', 'clipped_reward', 'discount', 'is_first', 'is_last',
-          'is_terminal', 'observation', 'reward'
+          'action', 'discount', 'is_first', 'is_last', 'is_terminal',
+          'observation', 'reward'
       }
       assert steps_ex['observation'].shape == (84, 84, 1)
+
+
+def _get_steps(data, window_size=4):
+  """Extract the steps dataset and create out of it a window dataset."""
+  episode_ds = data['steps']
+  # The line below creates a variant dataset
+  return episode_ds.window(window_size, drop_remainder=True)
+
+
+@pytest.mark.parametrize('num_sub_examples', [1, 36])
+def test_mocking_rlu_nested_dataset_with_windows(num_sub_examples,
+                                                 num_examples=3,
+                                                 max_value=8,
+                                                 window_size=4):
+  """Test of a nested dataset with windows.
+
+  In this test we use the dataset rlu_atari - see the docstring of
+  test_mocking_rlu_nested_dataset for a full list of features.
+
+  The test checks in particular that after application of the window method
+  the number of elements in the dataset is
+
+  num_examples * (num_sub_examples // window_size).
+
+  Args:
+    num_sub_examples: Number of examples to generate in a nested subdataset.
+    num_examples: Number of examples to generate in the dataset.
+    max_value: The maximum value present in generated tensors.
+    window_size: The size of the sequence window.
+  """
+  with tfds.testing.mock_data(
+      num_examples=num_examples,
+      num_sub_examples=num_sub_examples,
+      max_value=max_value,
+      policy=tfds.testing.MockPolicy.USE_CODE):
+    ds = tfds.load('rlu_atari/Pong_run_1', split='train')
+
+    for ex in ds.take(3):
+      ds_steps = ex['steps']
+      assert ds_steps.cardinality().numpy().item() == num_sub_examples
+
+      # the window method is applied in _get_steps
+      ds_flat_steps = ds.flat_map(
+          functools.partial(_get_steps, window_size=window_size))
+      ds_flat_steps = iter(ds_flat_steps)
+
+      assert len(list(ds_flat_steps)) == num_examples * (
+          num_sub_examples // window_size)
+
+      for obs_rew_act in ds_flat_steps:
+        assert obs_rew_act['observation'].element_spec == tf.TensorSpec(
+            shape=(84, 84, 1), dtype=tf.uint8)
+        assert (next(iter(tfds.as_numpy(obs_rew_act['observation']))) <=
+                max_value).all()
+        assert (next(iter(tfds.as_numpy(obs_rew_act['action']))) <=
+                max_value).all()

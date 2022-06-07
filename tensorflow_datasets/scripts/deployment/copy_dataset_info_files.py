@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ def _copy_metadata(from_dir, to_dir):
       tf.io.gfile.copy(from_path, to_path, overwrite=True)
 
 
-def copy(from_dir: tfds.core.PathLike, to_dir: tfds.core.PathLike) -> None:
+def copy(from_dir: tfds.typing.PathLike, to_dir: tfds.typing.PathLike) -> None:
   """Copy the info files from within `from_dir` to `to_dir`."""
   for full_name in tfds.core.load.list_full_names():
     from_full_name_dir = os.path.join(from_dir, full_name)

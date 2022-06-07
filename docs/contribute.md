@@ -116,7 +116,7 @@ pylint tensorflow_datasets/core/some_file.py
 ```
 
 You can try `yapf` to auto-format a file, but the tool is not perfect, so you'll
-likelly have to manually apply fixes afterward.
+likely have to manually apply fixes afterward.
 
 ```sh
 yapf tensorflow_datasets/core/some_file.py
@@ -166,7 +166,7 @@ matplotlib, scipy, six,...). You can read the
 if you're not familiar with pytest.
 
 Tests for DatasetBuilders are special and are documented in the
-[guide to add a dataset](https://github.com/tensorflow/datasets/tree/master/docs/add_dataset.md#test-your-dataset).
+[guide to add a dataset](https://github.com/tensorflow/datasets/blob/master/docs/add_dataset.md#test-your-dataset).
 
 ### Send the PR for reviews!
 

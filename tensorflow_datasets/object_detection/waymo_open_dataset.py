@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -85,7 +85,7 @@ class WaymoOpenDatasetConfig(tfds.core.BuilderConfig):
         version=tfds.core.Version("0.2.0"),
         description=description,
         **kwargs)
-    self.cloud_bucket = tfds.core.as_path(
+    self.cloud_bucket = tfds.core.Path(
         f"gs://waymo_open_dataset_{version_str}_individual_files/")
 
 

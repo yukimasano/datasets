@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,8 +16,12 @@
 """ClassLabel feature."""
 
 import os
+from typing import Union
+
 import tensorflow as tf
+from tensorflow_datasets.core.features import feature as feature_lib
 from tensorflow_datasets.core.features import tensor_feature
+from tensorflow_datasets.core.proto import feature_pb2
 from tensorflow_datasets.core.utils import type_utils
 
 Json = type_utils.Json
@@ -27,7 +31,14 @@ class ClassLabel(tensor_feature.Tensor):
   """`FeatureConnector` for integer class labels."""
 
   # If updating the signature here, LabeledImage should likely be updated too.
-  def __init__(self, *, num_classes=None, names=None, names_file=None):
+  def __init__(
+      self,
+      *,
+      num_classes=None,
+      names=None,
+      names_file=None,
+      doc: feature_lib.DocArg = None,
+  ):
     """Constructs a ClassLabel FeatureConnector.
 
     There are 3 ways to define a ClassLabel, which correspond to the 3
@@ -45,8 +56,9 @@ class ClassLabel(tensor_feature.Tensor):
         which the names are provided is kept.
       names_file: `str`, path to a file with names for the integer classes, one
         per line.
+      doc: Documentation of this feature (e.g. description).
     """
-    super(ClassLabel, self).__init__(shape=(), dtype=tf.int64)
+    super(ClassLabel, self).__init__(shape=(), dtype=tf.int64, doc=doc)
 
     self._num_classes = None
     self._str2int = None
@@ -180,11 +192,14 @@ class ClassLabel(tensor_feature.Tensor):
       return f"{ex} ({self.int2str(ex)})"
 
   @classmethod
-  def from_json_content(cls, value: Json) -> "ClassLabel":
-    return cls(**value)
+  def from_json_content(
+      cls, value: Union[Json, feature_pb2.ClassLabel]) -> "ClassLabel":
+    if isinstance(value, dict):
+      return cls(**value)
+    return cls(num_classes=value.num_classes)
 
-  def to_json_content(self) -> Json:
-    return {"num_classes": self.num_classes}
+  def to_json_content(self) -> feature_pb2.ClassLabel:
+    return feature_pb2.ClassLabel(num_classes=self.num_classes)
 
 
 def _get_names_filepath(data_dir, feature_name):

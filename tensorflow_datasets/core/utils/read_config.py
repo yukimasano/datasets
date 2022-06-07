@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 """This module contains the reader config."""
 
 import dataclasses
+import enum
 from typing import Callable, Optional, Sequence, Union
 
 import tensorflow as tf
@@ -38,8 +39,8 @@ class ReadConfig:
 
   Attributes:
     options: `tf.data.Options()`, dataset options to use. Note that when
-      `shuffle_files` is True and no seed is defined, experimental_deterministic
-      will be set to False internally, unless it is defined here.
+      `shuffle_files` is True and no seed is defined, deterministic will be set
+      to False internally, unless it is defined here.
     try_autocache: If True (default) and the dataset satisfy the right
       conditions (dataset small enough, files not shuffled,...) the dataset will
       be cached during the first iteration (through `ds = ds.cache()`).
@@ -77,6 +78,11 @@ class ReadConfig:
       interleaving files. By default using tf.data's AUTOTUNE.
     enable_ordering_guard: When True (default), an exception is raised if
       shuffling or interleaving are used on an ordered dataset.
+    assert_cardinality: When True (default), an exception is raised if at the
+      end of an Epoch the number of read examples does not match the expected
+      number from dataset metadata. A power user would typically want to set
+      False if input files have been tempered with and they don't mind missing
+      records or have too many of them.
   """
   # General tf.data.Dataset parametters
   options: tf.data.Options = dataclasses.field(default_factory=tf.data.Options)
@@ -98,3 +104,4 @@ class ReadConfig:
   num_parallel_calls_for_interleave_files: Optional[int] = (
       tf.data.experimental.AUTOTUNE)
   enable_ordering_guard: bool = True
+  assert_cardinality: bool = True

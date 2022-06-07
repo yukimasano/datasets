@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -92,20 +92,14 @@ class Cifar10(tfds.core.GeneratorBasedBuilder):
       for f in filenames:
         yield os.path.join(cifar_path, f)
 
-    return [
-        tfds.core.SplitGenerator(
-            name=tfds.Split.TRAIN,
-            gen_kwargs={
-                "split_prefix": "train_",
-                "filepaths": gen_filenames(cifar_info.train_files)
-            }),
-        tfds.core.SplitGenerator(
-            name=tfds.Split.TEST,
-            gen_kwargs={
-                "split_prefix": "test_",
-                "filepaths": gen_filenames(cifar_info.test_files)
-            }),
-    ]
+    return {
+        tfds.Split.TRAIN:
+            self._generate_examples("train_",
+                                    gen_filenames(cifar_info.train_files)),
+        tfds.Split.TEST:
+            self._generate_examples("test_",
+                                    gen_filenames(cifar_info.test_files)),
+    }
 
   def _generate_examples(self, split_prefix, filepaths):
     """Generate CIFAR examples as dicts.

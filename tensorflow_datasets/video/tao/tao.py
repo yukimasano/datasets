@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -272,7 +272,7 @@ class Tao(tfds.core.BeamBasedBuilder):
                    3)
     all_features = {
         'video':
-            tfds.features.Video(video_shape),
+            tfds.features.Video(video_shape),  # pytype: disable=wrong-arg-types  # gen-stub-imports
         'metadata': {
             'height':
                 tf.int32,

@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ from tensorflow_datasets.core import features
 from tensorflow_datasets.core import load
 from tensorflow_datasets.core import splits as splits_lib
 from tensorflow_datasets.core import utils
+from tensorflow_datasets.core.utils import file_utils
 from tensorflow_datasets.core.utils import read_config as read_config_lib
 
 DummyDatasetSharedGenerator = testing.DummyDatasetSharedGenerator
@@ -111,6 +112,34 @@ class DatasetBuilderTest(testing.TestCase):
       data = list(dataset_utils.as_numpy(dataset))
       self.assertEqual(20, len(data))
       self.assertLess(data[0]["x"], 30)
+
+  # Disable test until dependency on Riegeli is fixed.
+  # @testing.run_in_graph_and_eager_modes()
+  # def test_load_with_specified_format(self):
+  #   with testing.tmp_dir(self.get_temp_dir()) as tmp_dir:
+  #     dataset, ds_info = load.load(
+  #         name="dummy_dataset_with_configs",
+  #         with_info=True,
+  #         data_dir=tmp_dir,
+  #         download=True,
+  #         split=splits_lib.Split.TRAIN,
+  #         download_and_prepare_kwargs={"file_format": "riegeli"})
+  #     self.assertEqual(ds_info.file_format.name, "RIEGELI")
+  #     files = tf.io.gfile.listdir(
+  #         os.path.join(tmp_dir, "dummy_dataset_with_configs",
+  #                      "plus1", "0.0.1"))
+  #     self.assertSetEqual(
+  #         set(files), {
+  #             "dummy_dataset_with_configs-test.riegeli-00000-of-00001",
+  #             "dummy_dataset_with_configs-test.riegeli-00000-of-00001_index.json",
+  #             "dummy_dataset_with_configs-train.riegeli-00000-of-00001",
+  #             "dummy_dataset_with_configs-train.riegeli-00000-of-00001_index.json",
+  #             "features.json",
+  #             "dataset_info.json",
+  #         })
+  #     data = list(dataset_utils.as_numpy(dataset))
+  #     self.assertEqual(20, len(data))
+  #     self.assertLess(data[0]["x"], 30)
 
   @testing.run_in_graph_and_eager_modes()
   def test_determinism(self):
@@ -385,7 +414,7 @@ class DatasetBuilderMultiDirTest(testing.TestCase):
   def setUp(self):
     super(DatasetBuilderMultiDirTest, self).setUp()
     # Sanity check to make sure that no dir is registered
-    self.assertEmpty(constants._registered_data_dir)
+    self.assertEmpty(file_utils._registered_data_dir)
     # Create a new temp dir
     self.other_data_dir = os.path.join(self.get_temp_dir(), "other_dir")
     # Overwrite the default data_dir (as files get created)
@@ -396,7 +425,7 @@ class DatasetBuilderMultiDirTest(testing.TestCase):
   def tearDown(self):
     super(DatasetBuilderMultiDirTest, self).tearDown()
     # Restore to the default `_registered_data_dir`
-    constants._registered_data_dir = set()
+    file_utils._registered_data_dir = set()
     # Clear-up existing dirs
     if tf.io.gfile.exists(self.other_data_dir):
       tf.io.gfile.rmtree(self.other_data_dir)
@@ -425,7 +454,7 @@ class DatasetBuilderMultiDirTest(testing.TestCase):
     # No data_dir is passed
     # Multiple data_dirs are registered
     # -> use default path
-    constants.add_data_dir(self.other_data_dir)
+    file_utils.add_data_dir(self.other_data_dir)
     self.assertBuildDataDir(
         self.builder._build_data_dir(None), self.default_data_dir)
 
@@ -434,7 +463,7 @@ class DatasetBuilderMultiDirTest(testing.TestCase):
     # Multiple data_dirs are registered
     # Data dir contains old versions
     # -> use default path
-    constants.add_data_dir(self.other_data_dir)
+    file_utils.add_data_dir(self.other_data_dir)
     tf.io.gfile.makedirs(
         os.path.join(self.other_data_dir, "dummy_dataset_shared_generator",
                      "0.1.0"))
@@ -449,7 +478,7 @@ class DatasetBuilderMultiDirTest(testing.TestCase):
     # Multiple data_dirs are registered
     # Data found
     # -> Re-load existing data
-    constants.add_data_dir(self.other_data_dir)
+    file_utils.add_data_dir(self.other_data_dir)
     tf.io.gfile.makedirs(
         os.path.join(self.other_data_dir, "dummy_dataset_shared_generator",
                      "1.0.0"))
@@ -458,7 +487,7 @@ class DatasetBuilderMultiDirTest(testing.TestCase):
 
   def test_default_multi_dir_duplicate(self):
     # If two data dirs contains the dataset, raise an error...
-    constants.add_data_dir(self.other_data_dir)
+    file_utils.add_data_dir(self.other_data_dir)
     tf.io.gfile.makedirs(
         os.path.join(self.default_data_dir, "dummy_dataset_shared_generator",
                      "1.0.0"))
@@ -471,7 +500,7 @@ class DatasetBuilderMultiDirTest(testing.TestCase):
   def test_expicit_multi_dir(self):
     # If two data dirs contains the same version
     # Data dir is explicitly passed
-    constants.add_data_dir(self.other_data_dir)
+    file_utils.add_data_dir(self.other_data_dir)
     tf.io.gfile.makedirs(
         os.path.join(self.default_data_dir, "dummy_dataset_shared_generator",
                      "1.0.0"))
@@ -483,7 +512,7 @@ class DatasetBuilderMultiDirTest(testing.TestCase):
 
   def test_load_data_dir(self):
     """Ensure that `tfds.load` also supports multiple data_dir."""
-    constants.add_data_dir(self.other_data_dir)
+    file_utils.add_data_dir(self.other_data_dir)
 
     class MultiDirDataset(DummyDatasetSharedGenerator):  # pylint: disable=unused-variable
       VERSION = utils.Version("1.2.0")
@@ -520,9 +549,8 @@ class OrderedDatasetBuilderTest(testing.TestCase):
   @classmethod
   def setUpClass(cls):
     super(OrderedDatasetBuilderTest, cls).setUpClass()
-    with mock.patch(
-        "tensorflow_datasets.core.tfrecords_writer._get_number_shards",
-        lambda x, y: 10):
+    with mock.patch("tensorflow_datasets.core.writer._get_number_shards",
+                    lambda x, y: 10):
       cls.builder = DummyOrderedDataset(
           data_dir=os.path.join(tempfile.gettempdir(), "tfds"))
       cls.builder.download_and_prepare()
@@ -601,6 +629,25 @@ class BuilderRestoreGcsTest(testing.TestCase):
       # Statistics should have been recomputed
       self.assertEqual(builder.info.splits["train"].num_examples, 20)
     self.patch_gcs.start()
+
+
+class DatasetBuilderGenerateModeTest(testing.TestCase):
+
+  @classmethod
+  def setUpClass(cls):
+    super(DatasetBuilderGenerateModeTest, cls).setUpClass()
+
+  def test_reuse_cache_if_exists(self):
+    with testing.tmp_dir(self.get_temp_dir()) as tmp_dir:
+      builder = testing.DummyMnist(data_dir=tmp_dir)
+      dl_config = download.DownloadConfig(max_examples_per_split=3)
+      builder.download_and_prepare(download_config=dl_config)
+
+      dl_config = download.DownloadConfig(
+          download_mode=download.GenerateMode.REUSE_CACHE_IF_EXISTS,
+          max_examples_per_split=5)
+      builder.download_and_prepare(download_config=dl_config)
+      self.assertEqual(builder.info.splits["train"].num_examples, 5)
 
 
 class DatasetBuilderReadTest(testing.TestCase):

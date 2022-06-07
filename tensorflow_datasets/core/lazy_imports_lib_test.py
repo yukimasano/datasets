@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ class LazyImportsTest(testing.TestCase, parameterized.TestCase):
       "bs4",
       "cv2",
       "gcld3",
+      "gcsfs_store",
       "langdetect",
       "lxml",
       "matplotlib",
@@ -44,6 +45,7 @@ class LazyImportsTest(testing.TestCase, parameterized.TestCase):
       "skimage",
       "tifffile",
       "tldextract",
+      "zarr",
   )
   def test_import(self, module_name):
     getattr(tfds.core.lazy_imports, module_name)

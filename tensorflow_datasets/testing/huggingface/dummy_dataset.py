@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ class HFDataset(datasets.GeneratorBasedBuilder):
   def _generate_examples(self, num_vals):
     """This function returns the examples in the raw (text) form."""
     # Path is mocked
-    assert isinstance(Path("some_path/"), tfds.core.utils.gpath._GPath)  # pylint: disable=protected-access
+    assert isinstance(Path("some_path/"), tfds.core.Path)  # pylint: disable=protected-access
     for i in range(num_vals):
       yield i, {
           "id": str(i),

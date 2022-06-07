@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import textwrap
 from typing import Iterator
 from unittest import mock
 
+from etils import epath
 import pytest
 
 from tensorflow_datasets.core import dataset_builder
@@ -37,9 +38,9 @@ from tensorflow_datasets.core.community import register_package
 
 
 @contextlib.contextmanager
-def mock_cache_path(new_cache_dir: utils.PathLike) -> Iterator[None]:
+def mock_cache_path(new_cache_dir: epath.PathLike) -> Iterator[None]:
   """Mock which overwrite the cache path."""
-  new_dir = utils.as_path(new_cache_dir)
+  new_dir = epath.Path(new_cache_dir)
 
   # Use `__wrapped__` to access the original function wrapped inside
   # `functools.lru_cache`
@@ -95,7 +96,7 @@ def test_builder_cls(dummy_register):  # pylint: disable=redefined-outer-name
   builder_cls = dummy_register.builder_cls(ds_name)
   assert builder_cls.name == 'dummy_dataset'
 
-  clshash = 'd56c12548420c4101f36637fea941e4cbfc55aa3a005e0ea6d29b6401ec1e8bd'
+  clshash = 'e58f413affd65c267bae7acbd27fd5ac673d3e3ae13c316ffc2a461d00c8ab56'
   assert installed_path / f'{clshash}/dummy_dataset.py' == builder_cls.code_path
   assert 'kaggle' in builder_cls.code_path.parts
   assert issubclass(builder_cls, dataset_builder.DatasetBuilder)

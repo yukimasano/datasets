@@ -25,11 +25,15 @@ and some endings which complete the context.
 
 *   **Versions**:
 
-    *   **`0.0.1`** (default): No release notes.
+    *   `0.0.1`: No release notes.
+    *   `1.0.0`: Adding separate splits for in-domain and out-of-domain
+        validation/test sets.
+    *   **`1.1.0`** (default): Another split dimension for source (wikihow vs
+        activitynet)
 
 *   **Download size**: `68.18 MiB`
 
-*   **Dataset size**: `51.66 MiB`
+*   **Dataset size**: `107.45 MiB`
 
 *   **Auto-cached**
     ([documentation](https://www.tensorflow.org/datasets/performances#auto-caching)):
@@ -37,13 +41,23 @@ and some endings which complete the context.
 
 *   **Splits**:
 
-Split          | Examples
-:------------- | -------:
-`'test'`       | 10,003
-`'train'`      | 39,905
-`'validation'` | 10,042
+Split                          | Examples
+:----------------------------- | -------:
+`'test'`                       | 10,003
+`'test_ind_activitynet'`       | 1,870
+`'test_ind_wikihow'`           | 3,132
+`'test_ood_activitynet'`       | 1,651
+`'test_ood_wikihow'`           | 3,350
+`'train'`                      | 39,905
+`'train_activitynet'`          | 14,740
+`'train_wikihow'`              | 25,165
+`'validation'`                 | 10,042
+`'validation_ind_activitynet'` | 1,809
+`'validation_ind_wikihow'`     | 3,192
+`'validation_ood_activitynet'` | 1,434
+`'validation_ood_wikihow'`     | 3,607
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
@@ -51,9 +65,22 @@ FeaturesDict({
     'context': Text(shape=(), dtype=tf.string),
     'endings': Sequence(Text(shape=(), dtype=tf.string)),
     'label': tf.int32,
+    'source_id': Text(shape=(), dtype=tf.string),
     'split_type': Text(shape=(), dtype=tf.string),
 })
 ```
+
+*   **Feature documentation**:
+
+Feature        | Class          | Shape   | Dtype     | Description
+:------------- | :------------- | :------ | :-------- | :----------
+               | FeaturesDict   |         |           |
+activity_label | Text           |         | tf.string |
+context        | Text           |         | tf.string |
+endings        | Sequence(Text) | (None,) | tf.string |
+label          | Tensor         |         | tf.int32  |
+source_id      | Text           |         | tf.string |
+split_type     | Text           |         | tf.string |
 
 *   **Supervised keys** (See
     [`as_supervised` doc](https://www.tensorflow.org/datasets/api_docs/python/tfds/load#args)):
@@ -72,24 +99,27 @@ FeaturesDict({
 
 <button id="displaydataframe">Display examples...</button>
 <div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
 <script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/hellaswag-0.0.1.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
+const url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/hellaswag-1.1.0.html";
+const dataButton = document.getElementById('displaydataframe');
+dataButton.addEventListener('click', async () => {
+  // Disable the button after clicking (dataframe loaded only once).
+  dataButton.disabled = true;
 
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
+  const contentPane = document.getElementById('dataframecontent');
+  try {
+    const response = await fetch(url);
+    // Error response codes don't throw an error, so force an error to show
+    // the error message.
+    if (!response.ok) throw Error(response.statusText);
+
+    const data = await response.text();
+    contentPane.innerHTML = data;
+  } catch (e) {
+    contentPane.innerHTML =
         'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
+        + 'a new issue.';
+  }
 });
 </script>
 
@@ -107,3 +137,4 @@ $(document).ready(() => {
     year={2019}
 }
 ```
+

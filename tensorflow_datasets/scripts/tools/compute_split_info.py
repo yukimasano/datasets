@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,13 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-r"""Beam pipeline which compute the number of examples in the given tfrecord.
+r"""Beam pipeline which computes the number of examples in the given tfrecord.
 
 Compute the split info (num shards, num examples,...) metadata required
 by `tfds.core.DatasetInfo`. See documentation and usage at:
-https://www.tensorflow.org/datasets/external_tfrecord
-
-See documentation for usage:
 https://www.tensorflow.org/datasets/external_tfrecord
 
 """
@@ -30,22 +27,25 @@ from typing import List
 from absl import app
 from absl.flags import argparse_flags
 import tensorflow_datasets as tfds
+from tensorflow_datasets.scripts.utils import flag_utils
 
 
 # Open source pytests globally import all files, so create duplicate FLAGS
 # error when using absl.flags. So we use argparse instead.
 def _parse_flags(argv: List[str]) -> argparse.Namespace:
-  """Parse command line flags."""
+  """Parses command line flags."""
+  argv = flag_utils.normalize_flags(argv)  # See b/174043007 for context.
+
   parser = argparse_flags.ArgumentParser(
       description='Tensorflow Datasets CLI tool',)
   parser.add_argument(
       '--data_dir',
-      type=tfds.core.as_path,
+      type=tfds.core.Path,
       help='Path to the dataset files.',
   )
   parser.add_argument(
       '--out_dir',
-      type=tfds.core.as_path,
+      type=tfds.core.Path,
       help='Computed metadata will be written here.',
   )
   return parser.parse_args(argv[1:])
@@ -53,7 +53,7 @@ def _parse_flags(argv: List[str]) -> argparse.Namespace:
 
 def main(args: argparse.Namespace) -> None:
 
-  tfds.folder_dataset.compute_split_info(
+  tfds.folder_dataset.compute_split_info_from_directory(
       data_dir=args.data_dir,
       out_dir=args.out_dir,
   )

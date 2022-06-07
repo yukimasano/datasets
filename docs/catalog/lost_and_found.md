@@ -63,6 +63,10 @@ Split     | Examples
     ([tfds.show_examples](https://www.tensorflow.org/datasets/api_docs/python/tfds/visualization/show_examples)):
     Not supported.
 
+*   **Examples**
+    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
+    Missing.
+
 *   **Citation**:
 
 ```
@@ -74,13 +78,14 @@ Split     | Examples
 }
 ```
 
+
 ## lost_and_found/semantic_segmentation (default config)
 
 *   **Config description**: Lost and Found semantic segmentation dataset.
 
 *   **Download size**: `5.44 GiB`
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
@@ -90,39 +95,14 @@ FeaturesDict({
 })
 ```
 
-*   **Examples**
-    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
+*   **Feature documentation**:
 
-<!-- mdformat off(HTML should not be auto-formatted) -->
-
-{% framebox %}
-
-<button id="displaydataframe">Display examples...</button>
-<div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
-<script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/lost_and_found-semantic_segmentation-1.0.0.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
-
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
-        'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
-});
-</script>
-
-{% endframebox %}
-
-<!-- mdformat on -->
+Feature            | Class        | Shape           | Dtype     | Description
+:----------------- | :----------- | :-------------- | :-------- | :----------
+                   | FeaturesDict |                 |           |
+image_id           | Text         |                 | tf.string |
+image_left         | Image        | (1024, 2048, 3) | tf.uint8  |
+segmentation_label | Image        | (1024, 2048, 1) | tf.uint8  |
 
 ## lost_and_found/stereo_disparity
 
@@ -130,7 +110,7 @@ $(document).ready(() => {
 
 *   **Download size**: `12.16 GiB`
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
@@ -141,39 +121,15 @@ FeaturesDict({
 })
 ```
 
-*   **Examples**
-    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
+*   **Feature documentation**:
 
-<!-- mdformat off(HTML should not be auto-formatted) -->
-
-{% framebox %}
-
-<button id="displaydataframe">Display examples...</button>
-<div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
-<script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/lost_and_found-stereo_disparity-1.0.0.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
-
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
-        'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
-});
-</script>
-
-{% endframebox %}
-
-<!-- mdformat on -->
+Feature       | Class        | Shape           | Dtype     | Description
+:------------ | :----------- | :-------------- | :-------- | :----------
+              | FeaturesDict |                 |           |
+disparity_map | Image        | (1024, 2048, 1) | tf.uint8  |
+image_id      | Text         |                 | tf.string |
+image_left    | Image        | (1024, 2048, 3) | tf.uint8  |
+image_right   | Image        | (1024, 2048, 3) | tf.uint8  |
 
 ## lost_and_found/full
 
@@ -181,7 +137,7 @@ $(document).ready(() => {
 
 *   **Download size**: `12.19 GiB`
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
@@ -194,39 +150,17 @@ FeaturesDict({
 })
 ```
 
-*   **Examples**
-    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
+*   **Feature documentation**:
 
-<!-- mdformat off(HTML should not be auto-formatted) -->
-
-{% framebox %}
-
-<button id="displaydataframe">Display examples...</button>
-<div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
-<script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/lost_and_found-full-1.0.0.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
-
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
-        'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
-});
-</script>
-
-{% endframebox %}
-
-<!-- mdformat on -->
+Feature            | Class        | Shape           | Dtype     | Description
+:----------------- | :----------- | :-------------- | :-------- | :----------
+                   | FeaturesDict |                 |           |
+disparity_map      | Image        | (1024, 2048, 1) | tf.uint8  |
+image_id           | Text         |                 | tf.string |
+image_left         | Image        | (1024, 2048, 3) | tf.uint8  |
+image_right        | Image        | (1024, 2048, 3) | tf.uint8  |
+instance_id        | Image        | (1024, 2048, 1) | tf.uint8  |
+segmentation_label | Image        | (1024, 2048, 1) | tf.uint8  |
 
 ## lost_and_found/full_16bit
 
@@ -234,7 +168,7 @@ $(document).ready(() => {
 
 *   **Download size**: `34.90 GiB`
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
@@ -247,36 +181,14 @@ FeaturesDict({
 })
 ```
 
-*   **Examples**
-    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
+*   **Feature documentation**:
 
-<!-- mdformat off(HTML should not be auto-formatted) -->
-
-{% framebox %}
-
-<button id="displaydataframe">Display examples...</button>
-<div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
-<script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/lost_and_found-full_16bit-1.0.0.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
-
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
-        'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
-});
-</script>
-
-{% endframebox %}
-
-<!-- mdformat on -->
+Feature            | Class        | Shape           | Dtype     | Description
+:----------------- | :----------- | :-------------- | :-------- | :----------
+                   | FeaturesDict |                 |           |
+disparity_map      | Image        | (1024, 2048, 1) | tf.uint8  |
+image_id           | Text         |                 | tf.string |
+image_left         | Image        | (1024, 2048, 3) | tf.uint8  |
+image_right        | Image        | (1024, 2048, 3) | tf.uint8  |
+instance_id        | Image        | (1024, 2048, 1) | tf.uint8  |
+segmentation_label | Image        | (1024, 2048, 1) | tf.uint8  |

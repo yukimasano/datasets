@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,8 +23,6 @@
 
 from unittest import mock
 
-import tensorflow as tf
-from tensorflow_datasets.core import constants
 from tensorflow_datasets.core import load
 from tensorflow_datasets.core.github_api import github_path
 from tensorflow_datasets.testing import test_utils
@@ -33,8 +31,8 @@ from tensorflow_datasets.testing import test_utils
 def assert_no_api_call():
   """Globally disable github API calls."""
   with mock.patch.object(
-      github_path._PathMetadata,  # pylint: disable=protected-access
-      '_query_github',
+      github_path.GithubApi,  # pylint: disable=protected-access
+      'query',
       side_effect=AssertionError('Forbidden API call'),
   ):
     yield

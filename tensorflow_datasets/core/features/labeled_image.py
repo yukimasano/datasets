@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,14 +17,17 @@
 
 from typing import Dict, List, Optional, Union
 
+from etils import epath
 import tensorflow as tf
 from tensorflow_datasets.core.features import class_label_feature
+from tensorflow_datasets.core.features import feature as feature_lib
 from tensorflow_datasets.core.features import image_feature
+from tensorflow_datasets.core.proto import feature_pb2
 from tensorflow_datasets.core.utils import type_utils
 
 Json = type_utils.Json
 
-_LabelArg = Union[List[str], type_utils.PathLike, None, int]
+_LabelArg = Union[List[str], epath.PathLike, None, int]
 
 
 class LabeledImage(image_feature.Image):
@@ -50,6 +53,7 @@ class LabeledImage(image_feature.Image):
       shape: Optional[type_utils.Shape] = None,
       dtype: Optional[tf.dtypes.DType] = None,
       encoding_format: Optional[str] = None,
+      doc: feature_lib.DocArg = None,
   ):
     """Constructor.
 
@@ -68,6 +72,7 @@ class LabeledImage(image_feature.Image):
       shape: Image shape (see `tfds.features.Image.__init__`)
       dtype: Image dtype (see `tfds.features.Image.__init__`)
       encoding_format: 'jpeg' or 'png' (see `tfds.features.Image.__init__`)
+      doc: Documentation of this feature (e.g. description).
     """
     super().__init__(
         # Label images have a single channel
@@ -75,6 +80,7 @@ class LabeledImage(image_feature.Image):
         dtype=dtype,
         encoding_format=encoding_format,
         use_colormap=True,  # LabeledImage always use colormap
+        doc=doc,
     )
     if self.shape[-1] != 1:
       raise ValueError(
@@ -104,14 +110,22 @@ class LabeledImage(image_feature.Image):
     return {'num_classes': self.num_classes}
 
   @classmethod
-  def from_json_content(cls, value: Json) -> 'LabeledImage':
-    return cls(**value)
+  def from_json_content(
+      cls, value: Union[Json, feature_pb2.ImageFeature]) -> 'LabeledImage':
+    if isinstance(value, dict):
+      # For backwards compatibility
+      return cls(**value)
+    return cls(
+        shape=feature_lib.from_shape_proto(value.shape),
+        dtype=feature_lib.parse_dtype(value.dtype),
+        encoding_format=value.encoding_format or None,
+        labels=value.label.num_classes or None,
+    )
 
-  def to_json_content(self) -> Json:
-    content = super().to_json_content()
-    content.pop('use_colormap')
-    content['labels'] = self.num_classes
-    return content
+  def to_json_content(self) -> feature_pb2.ImageFeature:
+    feature = super().to_json_content()
+    feature.label.CopyFrom(feature_pb2.ClassLabel(num_classes=self.num_classes))
+    return feature
 
 
 def _labels_to_kwarg(labels: _LabelArg) -> Dict[str, _LabelArg]:
@@ -120,7 +134,7 @@ def _labels_to_kwarg(labels: _LabelArg) -> Dict[str, _LabelArg]:
     return {}
   elif isinstance(labels, int):
     kwarg_name = 'num_classes'
-  elif isinstance(labels, type_utils.PathLikeCls):
+  elif isinstance(labels, epath.PathLikeCls):
     kwarg_name = 'names_file'
   elif isinstance(labels, list):
     kwarg_name = 'names'

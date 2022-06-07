@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,15 +27,20 @@ from tensorflow_datasets import testing
 from tensorflow_datasets.core import dataset_info
 from tensorflow_datasets.core import features
 from tensorflow_datasets.core import file_adapters
+from tensorflow_datasets.core import naming
 from tensorflow_datasets.core import read_only_builder
+from tensorflow_datasets.core import splits as splits_lib
 from tensorflow_datasets.core import utils
+from tensorflow_datasets.core.proto import dataset_info_pb2
+from tensorflow_datasets.core.proto import feature_pb2
 from tensorflow_datasets.image_classification import mnist
 
+from google.protobuf import text_format
+
 _TFDS_DIR = utils.tfds_path()
-_INFO_DIR = os.path.join(_TFDS_DIR, "testing", "test_data", "dataset_info",
-                         "mnist", "3.0.1")
-_INFO_DIR_UNLABELED = os.path.join(_TFDS_DIR, "testing", "test_data",
-                                   "dataset_info", "mnist_unlabeled", "3.0.1")
+_DATA_DIR = os.path.join(_TFDS_DIR, "testing", "test_data", "dataset_info")
+_INFO_DIR = os.path.join(_DATA_DIR, "mnist", "3.0.1")
+_INFO_DIR_UNLABELED = os.path.join(_DATA_DIR, "mnist_unlabeled", "3.0.1")
 _NON_EXISTENT_DIR = os.path.join(_TFDS_DIR, "non_existent_dir")
 
 DummyDatasetSharedGenerator = testing.DummyDatasetSharedGenerator
@@ -70,7 +75,7 @@ class DatasetInfoTest(testing.TestCase):
   def setUpClass(cls):
     super(DatasetInfoTest, cls).setUpClass()
     cls._tfds_tmp_dir = testing.make_tmp_dir()
-    cls._builder = DummyDatasetSharedGenerator(data_dir=cls._tfds_tmp_dir)
+    cls._builder = mnist.MNIST(data_dir=cls._tfds_tmp_dir)
 
   @classmethod
   def tearDownClass(cls):
@@ -83,14 +88,24 @@ class DatasetInfoTest(testing.TestCase):
         FileNotFoundError, "from a directory which does not exist"):
       info.read_from_directory(_NON_EXISTENT_DIR)
 
+  def test_reading_different_version(self):
+    info = dataset_info.DatasetInfo(builder=self._builder)
+    info._identity.version = utils.Version("2.0.0")
+    with pytest.raises(
+        AssertionError,
+        match="The constructed DatasetInfo instance and the restored proto version do not match"
+    ):
+      # The dataset in _INFO_DIR has version 3.0.1 whereas the builder is 2.0.0
+      info.read_from_directory(_INFO_DIR)
+
   def test_reading(self):
     info = dataset_info.DatasetInfo(builder=self._builder)
     info.read_from_directory(_INFO_DIR)
 
     # Assert that we read the file and initialized DatasetInfo.
     self.assertTrue(info.initialized)
-    self.assertEqual("dummy_dataset_shared_generator", info.name)
-    self.assertEqual("dummy_dataset_shared_generator/1.0.0", info.full_name)
+    self.assertEqual("mnist", info.name)
+    self.assertEqual("mnist/3.0.1", info.full_name)
 
     # Test splits are initialized properly.
     split_dict = info.splits
@@ -108,8 +123,12 @@ class DatasetInfoTest(testing.TestCase):
 
     self.assertEqual("image", info.supervised_keys[0])
     self.assertEqual("label", info.supervised_keys[1])
-    self.assertEqual(info.module_name, "tensorflow_datasets.testing.test_utils")
+    self.assertEqual(info.module_name,
+                     "tensorflow_datasets.image_classification.mnist")
     self.assertEqual(False, info.disable_shuffling)
+
+    self.assertEqual(info.version, utils.Version("3.0.1"))
+    self.assertEqual(info.release_notes, {})
 
   def test_disable_shuffling(self):
     info = dataset_info.DatasetInfo(
@@ -127,15 +146,14 @@ class DatasetInfoTest(testing.TestCase):
 
   def test_writing(self):
     # First read in stuff.
-    mnist_builder = mnist.MNIST(
-        data_dir=tempfile.mkdtemp(dir=self.get_temp_dir()))
+    mnist_builder = mnist.MNIST(data_dir=_DATA_DIR)
 
     info = dataset_info.DatasetInfo(
         builder=mnist_builder, features=mnist_builder.info.features)
     info.read_from_directory(_INFO_DIR)
 
     # Read the json file into a string.
-    with tf.io.gfile.GFile(info._dataset_info_path(_INFO_DIR)) as f:
+    with tf.io.gfile.GFile(dataset_info.dataset_info_path(_INFO_DIR)) as f:
       existing_json = json.load(f)
 
     # Now write to a temp directory.
@@ -143,11 +161,11 @@ class DatasetInfoTest(testing.TestCase):
       info.write_to_directory(tmp_dir)
 
       # Read the newly written json file into a string.
-      with tf.io.gfile.GFile(info._dataset_info_path(tmp_dir)) as f:
+      with tf.io.gfile.GFile(dataset_info.dataset_info_path(tmp_dir)) as f:
         new_json = json.load(f)
 
       # Read the newly written LICENSE file into a string.
-      with tf.io.gfile.GFile(info._license_path(tmp_dir)) as f:
+      with tf.io.gfile.GFile(dataset_info.license_path(tmp_dir)) as f:
         license_ = f.read()
 
     # Assert what was read and then written and read again is the same.
@@ -171,8 +189,11 @@ class DatasetInfoTest(testing.TestCase):
         license="some license",
     )
     info.download_size = 456
-    info.as_proto.splits.add(name="train", num_bytes=512)
-    info.as_proto.splits.add(name="validation", num_bytes=64)
+    filepath_template = "{DATASET}-{SPLIT}.{FILEFORMAT}-{SHARD_X_OF_Y}"
+    info.as_proto.splits.add(
+        name="train", num_bytes=512, filepath_template=filepath_template)
+    info.as_proto.splits.add(
+        name="validation", num_bytes=64, filepath_template=filepath_template)
     info.as_proto.schema.feature.add()
     info.as_proto.schema.feature.add()  # Add dynamic statistics
     info.download_checksums = {
@@ -187,7 +208,7 @@ class DatasetInfoTest(testing.TestCase):
       # If fields are not defined, then everything is restored from disk
       restored_info = dataset_info.DatasetInfo(builder=self._builder)
       restored_info.read_from_directory(tmp_dir)
-      self.assertEqual(info.as_proto, restored_info.as_proto)
+      self.assertProtoEquals(info.as_proto, restored_info.as_proto)
 
     with testing.tmp_dir(self.get_temp_dir()) as tmp_dir:
       # Save it
@@ -216,6 +237,8 @@ class DatasetInfoTest(testing.TestCase):
       # Even though restored_info has been restored, informations defined in
       # the code overwrite informations from the json file.
       self.assertEqual(restored_info.description, "A description")
+      self.assertEqual(restored_info.version, utils.Version("3.0.1"))
+      self.assertEqual(restored_info.release_notes, {})
       self.assertEqual(restored_info.supervised_keys,
                        ("input (new)", "output (new)"))
       self.assertEqual(restored_info.homepage, "http://some-location-new")
@@ -285,6 +308,72 @@ class DatasetInfoTest(testing.TestCase):
     self.assertEqual(40, info.splits.total_num_examples)
     self.assertEqual(2, len(info.as_proto.schema.feature))
 
+  def test_set_splits_normal(self):
+    info = dataset_info.DatasetInfo(builder=self._builder)
+    split_info1 = splits_lib.SplitInfo(
+        name="train", shard_lengths=[1, 2], num_bytes=0)
+    split_info2 = splits_lib.SplitInfo(
+        name="test", shard_lengths=[1], num_bytes=0)
+    split_dict = splits_lib.SplitDict(split_infos=[split_info1, split_info2])
+    info.set_splits(split_dict)
+    self.assertEqual(str(info.splits), str(split_dict))
+    self.assertEqual(
+        str(info.as_proto.splits),
+        str([split_info1.to_proto(),
+             split_info2.to_proto()]))
+
+  def test_set_splits_incorrect_dataset_name(self):
+    info = dataset_info.DatasetInfo(builder=self._builder)
+    split_info1 = splits_lib.SplitInfo(
+        name="train",
+        shard_lengths=[1, 2],
+        num_bytes=0,
+        filename_template=naming.ShardedFileTemplate(
+            dataset_name="some_other_dataset",
+            split="train",
+            data_dir=info.data_dir,
+            filetype_suffix="tfrecord"))
+    split_dict = splits_lib.SplitDict(split_infos=[split_info1])
+    with pytest.raises(
+        AssertionError, match="SplitDict contains SplitInfo for split"):
+      info.set_splits(split_dict)
+
+  def test_set_splits_multi_split_info(self):
+    info = dataset_info.DatasetInfo(builder=self._builder)
+    split_info1 = splits_lib.SplitInfo(
+        name="train", shard_lengths=[1, 2], num_bytes=0)
+    split_info2 = splits_lib.SplitInfo(
+        name="test", shard_lengths=[1], num_bytes=0)
+    multi_split_info1 = splits_lib.MultiSplitInfo(
+        name="train", split_infos=[split_info1])
+    multi_split_info2 = splits_lib.MultiSplitInfo(
+        name="test", split_infos=[split_info2])
+    split_dict = splits_lib.SplitDict(
+        split_infos=[multi_split_info1, multi_split_info2])
+    info.set_splits(split_dict)
+    self.assertEqual(str(info.splits), str(split_dict))
+    self.assertEqual(
+        str(info.as_proto.splits),
+        str([split_info1.to_proto(),
+             split_info2.to_proto()]))
+
+  def test_set_file_format_override_fails(self):
+    info = dataset_info.DatasetInfo(builder=self._builder)
+    info.set_file_format(file_adapters.FileFormat.TFRECORD)
+    self.assertEqual(info.file_format, file_adapters.FileFormat.TFRECORD)
+    with pytest.raises(
+        ValueError,
+        match="File format is already set to FileFormat.TFRECORD. Got FileFormat.RIEGELI"
+    ):
+      info.set_file_format(file_adapters.FileFormat.RIEGELI)
+
+  def test_set_file_format_override(self):
+    info = dataset_info.DatasetInfo(builder=self._builder)
+    info.set_file_format(file_adapters.FileFormat.TFRECORD)
+    self.assertEqual(info.file_format, file_adapters.FileFormat.TFRECORD)
+    info.set_file_format(file_adapters.FileFormat.RIEGELI, override=True)
+    self.assertEqual(info.file_format, file_adapters.FileFormat.RIEGELI)
+
 
 @pytest.mark.parametrize(
     "file_format",
@@ -339,6 +428,118 @@ def test_file_format_values(tmp_path: pathlib.Path):
     testing.DummyDataset(data_dir=tmp_path, file_format="arrow")
 
 
+def test_dataset_info_from_proto():
+  builder = RandomShapedImageGenerator(data_dir=testing.make_tmp_dir())
+  train = dataset_info_pb2.SplitInfo(
+      name="train", num_shards=2, shard_lengths=[4, 5])
+  test = dataset_info_pb2.SplitInfo(
+      name="test", num_shards=3, shard_lengths=[1, 2, 3])
+  text_feature = feature_pb2.Feature(
+      python_class_name="tensorflow_datasets.core.features.text_feature.Text",
+      text=feature_pb2.TextFeature())
+  proto = dataset_info_pb2.DatasetInfo(
+      name="random_shaped_image_generator",
+      version=str(builder.version),
+      features=feature_pb2.Feature(
+          python_class_name="tensorflow_datasets.core.features.features_dict.FeaturesDict",
+          features_dict=feature_pb2.FeaturesDict(
+              features={"text": text_feature})),
+      splits=[train, test])
+  result = dataset_info.DatasetInfo.from_proto(builder=builder, proto=proto)
+  assert result.splits["test"].shard_lengths == test.shard_lengths
+  assert result.splits["train"].shard_lengths == train.shard_lengths
+  assert set(result.features.keys()) == {"text"}
+  assert result.version == builder.version
+
+
+def test_supervised_keys_from_proto():
+  proto = text_format.Parse(
+      text="""
+  tuple: {
+      items: [
+        {
+          dict: {
+            dict: {
+              key: "f2"
+              value: { feature_key: "f2" }
+            },
+            dict: {
+              key: "f1"
+              value: { feature_key: "f1" }
+            },
+          }
+        },
+        {
+          feature_key: "target"
+        }
+      ]
+    }
+  """,
+      message=dataset_info_pb2.SupervisedKeys())
+  supervised_keys = dataset_info._supervised_keys_from_proto(proto=proto)
+  assert str(supervised_keys) == "({'f1': 'f1', 'f2': 'f2'}, 'target')"
+
+
+def test_supervised_keys_from_proto_different_ordering():
+  proto1 = text_format.Parse(
+      text="""
+  tuple: {
+      items: [
+        {
+          dict: {
+            dict: {
+              key: "f1"
+              value: { feature_key: "f1" }
+            },
+            dict: {
+              key: "f2"
+              value: { feature_key: "f2" }
+            },
+            dict: {
+              key: "f3"
+              value: { feature_key: "f3" }
+            },
+          }
+        },
+        {
+          feature_key: "target"
+        }
+      ]
+    }
+  """,
+      message=dataset_info_pb2.SupervisedKeys())
+  proto2 = text_format.Parse(
+      text="""
+  tuple: {
+      items: [
+        {
+          dict: {
+            dict: {
+              key: "f3"
+              value: { feature_key: "f3" }
+            },
+            dict: {
+              key: "f2"
+              value: { feature_key: "f2" }
+            },
+            dict: {
+              key: "f1"
+              value: { feature_key: "f1" }
+            },
+          }
+        },
+        {
+          feature_key: "target"
+        }
+      ]
+    }
+  """,
+      message=dataset_info_pb2.SupervisedKeys())
+  supervised_keys1 = dataset_info._supervised_keys_from_proto(proto=proto1)
+  supervised_keys2 = dataset_info._supervised_keys_from_proto(proto=proto2)
+  assert str(supervised_keys1) == str(supervised_keys2)
+
+
 # pylint: disable=g-inconsistent-quotes
 _INFO_STR = '''tfds.core.DatasetInfo(
     name='mnist',
@@ -348,6 +549,7 @@ _INFO_STR = '''tfds.core.DatasetInfo(
     """,
     homepage='https://storage.googleapis.com/cvdf-datasets/mnist/',
     data_path='%s',
+    file_format=tfrecord,
     download_size=1.95 KiB,
     dataset_size=11.06 MiB,
     features=FeaturesDict({

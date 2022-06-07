@@ -35,11 +35,16 @@ each highlight, which is the target summary
 
     *   `3.0.0`: Using cased version.
 
-    *   **`3.1.0`** (default): Removed BuilderConfig
+    *   `3.1.0`: Removed BuilderConfig
+
+    *   `3.2.0`: Remove extra space before added sentence period. This shouldn't
+        affect ROUGE scores because punctuation is removed.
+
+    *   **`3.3.0`** (default): Add publisher feature.
 
 *   **Download size**: `558.32 MiB`
 
-*   **Dataset size**: `1.27 GiB`
+*   **Dataset size**: `1.28 GiB`
 
 *   **Auto-cached**
     ([documentation](https://www.tensorflow.org/datasets/performances#auto-caching)):
@@ -53,14 +58,24 @@ Split          | Examples
 `'train'`      | 287,113
 `'validation'` | 13,368
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
     'article': Text(shape=(), dtype=tf.string),
     'highlights': Text(shape=(), dtype=tf.string),
+    'publisher': Text(shape=(), dtype=tf.string),
 })
 ```
+
+*   **Feature documentation**:
+
+Feature    | Class        | Shape | Dtype     | Description
+:--------- | :----------- | :---- | :-------- | :----------
+           | FeaturesDict |       |           |
+article    | Text         |       | tf.string |
+highlights | Text         |       | tf.string |
+publisher  | Text         |       | tf.string |
 
 *   **Supervised keys** (See
     [`as_supervised` doc](https://www.tensorflow.org/datasets/api_docs/python/tfds/load#args)):
@@ -79,24 +94,27 @@ FeaturesDict({
 
 <button id="displaydataframe">Display examples...</button>
 <div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
 <script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/cnn_dailymail-3.1.0.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
+const url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/cnn_dailymail-3.3.0.html";
+const dataButton = document.getElementById('displaydataframe');
+dataButton.addEventListener('click', async () => {
+  // Disable the button after clicking (dataframe loaded only once).
+  dataButton.disabled = true;
 
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
+  const contentPane = document.getElementById('dataframecontent');
+  try {
+    const response = await fetch(url);
+    // Error response codes don't throw an error, so force an error to show
+    // the error message.
+    if (!response.ok) throw Error(response.statusText);
+
+    const data = await response.text();
+    contentPane.innerHTML = data;
+  } catch (e) {
+    contentPane.innerHTML =
         'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
+        + 'a new issue.';
+  }
 });
 </script>
 
@@ -131,3 +149,4 @@ $(document).ready(() => {
   year={2015}
 }
 ```
+

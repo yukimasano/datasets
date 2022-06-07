@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,4 +35,5 @@ from tensorflow_datasets.audio.tedlium import Tedlium
 from tensorflow_datasets.audio.vctk import Vctk
 from tensorflow_datasets.audio.voxceleb import Voxceleb
 from tensorflow_datasets.audio.voxforge import Voxforge
+from tensorflow_datasets.audio.xtreme_s import XtremeS
 from tensorflow_datasets.audio.yesno import YesNo

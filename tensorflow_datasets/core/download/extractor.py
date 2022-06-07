@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,11 +24,12 @@ import multiprocessing
 import os
 import tarfile
 import typing
-from typing import Iterator, Tuple
+from typing import Iterator, Tuple, Union
 import uuid
 import zipfile
 
 from absl import logging
+from etils import epath
 import promise
 import tensorflow as tf
 
@@ -112,7 +113,7 @@ class _Extractor(object):
       tf.io.gfile.rmtree(path_to_delete)
     tf.io.gfile.rename(to_path_tmp, to_path)
     self._pbar_path.update(1)
-    return utils.as_path(to_path)
+    return epath.Path(to_path)
 
 
 def _copy(src_file, dest_path):
@@ -136,7 +137,7 @@ def _normpath(path):
 
 @contextlib.contextmanager
 def _open_or_pass(path_or_fobj):
-  if isinstance(path_or_fobj, utils.PathLikeCls):
+  if isinstance(path_or_fobj, epath.PathLikeCls):
     with tf.io.gfile.GFile(path_or_fobj, 'rb') as f_obj:
       yield f_obj
   else:
@@ -228,7 +229,7 @@ _EXTRACT_METHODS = {
 
 
 def iter_archive(
-    path: utils.PathLike,
+    path: Union[epath.PathLike, typing.BinaryIO],
     method: resource_lib.ExtractMethod,
 ) -> Iterator[Tuple[str, typing.BinaryIO]]:
   """Iterate over an archive.

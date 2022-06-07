@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,9 +17,8 @@ r"""Script which parse registered repositories and save datasets found.
 
 """
 
-import itertools
 import json
-from typing import List, Optional
+from typing import List
 
 from absl import app
 import tensorflow_datasets as tfds
@@ -41,8 +40,8 @@ def main(_):
 
 
 def export_community_datasets(
-    in_path: tfds.typing.ReadWritePath,
-    out_path: tfds.typing.ReadWritePath,
+    in_path: tfds.core.Path,
+    out_path: tfds.core.Path,
 ) -> None:
   """Exports community datasets.
 
@@ -57,7 +56,7 @@ def export_community_datasets(
 
 
 def _find_community_ds_packages(
-    config_path: tfds.typing.ReadWritePath,) -> List[DatasetPackage]:
+    config_path: tfds.core.Path,) -> List[DatasetPackage]:
   """Find all namepaces/dataset from the config.
 
   Config should contain the instructions in the following format:
@@ -75,14 +74,19 @@ def _find_community_ds_packages(
     ds_packages: list of all found datasets.
   """
   config = toml.load(config_path)
-  all_packages = itertools.chain.from_iterable(
-      _list_ds_packages_for_namespace(namespace, tfds.core.as_path(
-          src_code_path))
-      for namespace, src_code_path in tqdm.tqdm(config['Namespaces'].items()))
+
+  all_packages = []
+  for namespace, src_code_path in tqdm.tqdm(config['Namespaces'].items()):
+    tqdm.tqdm.write(f'Searching datasets for {namespace}: {src_code_path}')
+    for pkg in tfds.core.community.register_package.list_ds_packages_for_namespace(
+        namespace=namespace, path=tfds.core.Path(src_code_path)):
+      tqdm.tqdm.write(str(pkg.name))
+      all_packages.append(pkg)
+
   return sorted(all_packages, key=lambda package: package.name)
 
 
-def _save_community_ds_packages(file_path: tfds.typing.ReadWritePath,
+def _save_community_ds_packages(file_path: tfds.core.Path,
                                 ds_packages: List[DatasetPackage]) -> None:
   """Save all loaded datasets in the package index.
 
@@ -100,97 +104,6 @@ def _save_community_ds_packages(file_path: tfds.typing.ReadWritePath,
   """
   pkg_json = [json.dumps(pkg.to_json()) for pkg in ds_packages]
   file_path.write_text('\n'.join(pkg_json) + '\n')
-
-
-def _list_ds_packages_for_namespace(
-    namespace: str,
-    path: tfds.typing.ReadOnlyPath,
-) -> List[DatasetPackage]:
-  """Returns the dataset names found in a specific directory.
-
-  The directory should have the following structure:
-
-  ```
-  <path>/
-      <dataset0>/
-          <dataset0>.py
-      <dataset1>/
-          <dataset1>.py
-      ...
-  ```
-
-  Additional files or folders which are not detected as datasets will be
-  ignored (e.g. `__init__.py`).
-
-  Args:
-    namespace: Namespace of the datasets
-    path: The directory path containing the datasets.
-
-  Returns:
-    ds_packages: The dataset packages found in the directory (sorted for
-      determinism).
-
-  Raises:
-    FileNotFoundError: If the path cannot be reached.
-  """
-  tqdm.tqdm.write(f'Searching datasets for {namespace}: {path}')
-  if not path.exists():
-    # Should be fault-tolerant in the future
-    raise FileNotFoundError(f'Could not find datasets at {path}')
-
-  all_packages = []
-  for ds_path in tqdm.tqdm(sorted(path.iterdir())):
-    source = _get_dataset_source(ds_path)
-    if source:
-      pkg = DatasetPackage(
-          name=tfds.core.utils.DatasetName(
-              namespace=namespace,
-              name=ds_path.name,
-          ),
-          source=source,
-      )
-      tqdm.tqdm.write(str(pkg.name))
-      all_packages.append(pkg)
-
-  return all_packages
-
-
-def _get_dataset_source(
-    ds_path: tfds.typing.ReadWritePath,) -> Optional[DatasetSource]:
-  """Returns True if the given path correspond to a dataset.
-
-  Currently a simple heuristic is used. This function checks the path has the
-  following structure:
-
-  ```
-  <ds_name>/
-      <ds_name>.py
-  ```
-
-  If so, all `.py`, `.txt`, `.tsv` files will be added to the package.
-
-  Args:
-    ds_path: Path of the dataset module
-
-  Returns:
-    True if the path match the expected file structure
-  """
-  filter_list = {'__init__.py'}
-  suffixes_list = ('.txt', '.tsv', '.py')
-
-  if not ds_path.is_dir():
-    return None
-  all_filenames = set(f.name for f in ds_path.iterdir())
-  # The dataset package is composed of all `.py` present in the dataset folder.
-  if f'{ds_path.name}.py' in all_filenames:
-    return DatasetSource(
-        root_path=ds_path,
-        filenames=sorted([
-            fname for fname in all_filenames
-            if fname.endswith(suffixes_list) and fname not in filter_list
-        ]),
-    )
-  return None
 
 
 if __name__ == '__main__':

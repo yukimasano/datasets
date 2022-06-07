@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,10 +24,11 @@ _EPISODE_LENGTH = 181
 class RluDmlabRoomsSelectNonmatchingObject(dmlab_dataset.DMLabDatasetBuilder):
   """DatasetBuilder for rlu_dmlab_rooms_select_nonmatching_object dataset."""
 
-  VERSION = tfds.core.Version('1.1.0')
+  VERSION = tfds.core.Version('1.2.0')
   RELEASE_NOTES = {
       '1.0.0': 'Initial release.',
       '1.1.0': 'Added is_last.',
+      '1.2.0': 'BGR -> RGB fix for pixel observations.',
   }
 
   # pytype: disable=wrong-keyword-args

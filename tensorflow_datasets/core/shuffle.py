@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -181,7 +181,8 @@ class Shuffler(object):
     self._disable_shuffling = disable_shuffling
     self._buckets = []
     for i in range(BUCKETS_NUMBER):
-      path = os.path.join(dirpath, 'bucket_%s_%03d.tmp' % (grp_name, i))
+      bucket_name = 'bucket_%s_%03d.tmp' % (grp_name, i)
+      path = os.path.join(dirpath, bucket_name)
       self._buckets.append(_Bucket(path))
     self._read_only = False
     self._total_bytes = 0

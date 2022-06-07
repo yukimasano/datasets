@@ -62,11 +62,12 @@ Split | Examples
 
 *   **Citation**:
 
+
 ## so2sat/rgb (default config)
 
 *   **Config description**: Sentinel-2 RGB channels
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
@@ -76,6 +77,15 @@ FeaturesDict({
 })
 ```
 
+*   **Feature documentation**:
+
+Feature   | Class        | Shape       | Dtype    | Description
+:-------- | :----------- | :---------- | :------- | :----------
+          | FeaturesDict |             |          |
+image     | Image        | (32, 32, 3) | tf.uint8 |
+label     | ClassLabel   |             | tf.int64 |
+sample_id | Tensor       |             | tf.int64 |
+
 *   **Supervised keys** (See
     [`as_supervised` doc](https://www.tensorflow.org/datasets/api_docs/python/tfds/load#args)):
     `('image', 'label')`
@@ -84,7 +94,7 @@ FeaturesDict({
 
 *   **Config description**: 8 Sentinel-1 and 10 Sentinel-2 channels
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
@@ -94,6 +104,16 @@ FeaturesDict({
     'sentinel2': Tensor(shape=(32, 32, 10), dtype=tf.float32),
 })
 ```
+
+*   **Feature documentation**:
+
+Feature   | Class        | Shape        | Dtype      | Description
+:-------- | :----------- | :----------- | :--------- | :----------
+          | FeaturesDict |              |            |
+label     | ClassLabel   |              | tf.int64   |
+sample_id | Tensor       |              | tf.int64   |
+sentinel1 | Tensor       | (32, 32, 8)  | tf.float32 |
+sentinel2 | Tensor       | (32, 32, 10) | tf.float32 |
 
 *   **Supervised keys** (See
     [`as_supervised` doc](https://www.tensorflow.org/datasets/api_docs/python/tfds/load#args)):

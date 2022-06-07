@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -337,7 +337,7 @@ class RluRwrl(rlu_common.RLUBuilder):
 
   def num_shards(self):
     try:
-      return self._SHARDS  # For testing.
+      return self._SHARDS  # For testing.  # type: ignore
     except AttributeError:
       pass
     domain = self.builder_config.domain

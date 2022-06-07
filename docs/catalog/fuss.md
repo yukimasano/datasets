@@ -59,7 +59,7 @@ Split          | Examples
 `'train'`      | 20,000
 `'validation'` | 1,000
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
@@ -78,6 +78,22 @@ FeaturesDict({
 })
 ```
 
+*   **Feature documentation**:
+
+Feature                     | Class        | Shape     | Dtype      | Description
+:-------------------------- | :----------- | :-------- | :--------- | :----------
+                            | FeaturesDict |           |            |
+id                          | Tensor       |           | tf.string  |
+jams                        | Tensor       |           | tf.string  |
+mixture_audio               | Audio        | (160000,) | tf.int16   |
+segments                    | Sequence     |           |            |
+segments/end_time_seconds   | Tensor       |           | tf.float32 |
+segments/label              | Tensor       |           | tf.string  |
+segments/start_time_seconds | Tensor       |           | tf.float32 |
+sources                     | Sequence     |           |            |
+sources/audio               | Audio        | (160000,) | tf.int16   |
+sources/label               | ClassLabel   |           | tf.int64   |
+
 *   **Supervised keys** (See
     [`as_supervised` doc](https://www.tensorflow.org/datasets/api_docs/python/tfds/load#args)):
     `('mixture_audio', 'sources')`
@@ -85,6 +101,10 @@ FeaturesDict({
 *   **Figure**
     ([tfds.show_examples](https://www.tensorflow.org/datasets/api_docs/python/tfds/visualization/show_examples)):
     Not supported.
+
+*   **Examples**
+    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
+    Missing.
 
 *   **Citation**:
 
@@ -105,6 +125,7 @@ FeaturesDict({
 }
 ```
 
+
 ## fuss/reverberant (default config)
 
 *   **Config description**: Default reverberated audio.
@@ -113,40 +134,6 @@ FeaturesDict({
 
 *   **Dataset size**: `43.20 GiB`
 
-*   **Examples**
-    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
-
-<!-- mdformat off(HTML should not be auto-formatted) -->
-
-{% framebox %}
-
-<button id="displaydataframe">Display examples...</button>
-<div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
-<script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/fuss-reverberant-1.2.0.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
-
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
-        'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
-});
-</script>
-
-{% endframebox %}
-
-<!-- mdformat on -->
-
 ## fuss/unprocessed
 
 *   **Config description**: Unprocessed audio without additional reverberation.
@@ -154,37 +141,3 @@ $(document).ready(() => {
 *   **Download size**: `8.28 GiB`
 
 *   **Dataset size**: `45.58 GiB`
-
-*   **Examples**
-    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
-
-<!-- mdformat off(HTML should not be auto-formatted) -->
-
-{% framebox %}
-
-<button id="displaydataframe">Display examples...</button>
-<div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
-<script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/fuss-unprocessed-1.2.0.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
-
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
-        'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
-});
-</script>
-
-{% endframebox %}
-
-<!-- mdformat on -->

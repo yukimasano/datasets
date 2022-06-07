@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,12 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Utils to download locally dataset code source stored remotelly."""
+"""Utils to download remotely stored dataset source code."""
 
+import dataclasses
 import os
 from typing import List
-import dataclasses
 
+from etils import epath
 from tensorflow_datasets.core import utils
 
 
@@ -31,18 +32,18 @@ class DatasetSource:
       `gs://.../my_dataset/`, `github://.../my_dataset/`)
     filenames: Content of the dataset package
   """
-  root_path: utils.ReadWritePath
+  root_path: epath.Path
   filenames: List[str]
 
   @classmethod
   def from_json(cls, value: utils.JsonValue) -> 'DatasetSource':
     """Imports from JSON."""
     if isinstance(value, str):  # Single-file dataset ('.../my_dataset.py')
-      path = utils.as_path(value)
+      path = epath.Path(value)
       return cls(root_path=path.parent, filenames=[path.name])
     elif isinstance(value, dict):  # Multi-file dataset
       return cls(
-          root_path=utils.as_path(value['root_path']),
+          root_path=epath.Path(value['root_path']),
           filenames=value['filenames'],
       )
     else:
@@ -61,17 +62,17 @@ class DatasetSource:
 
 def download_from_source(
     source: DatasetSource,
-    dst: utils.ReadWritePath,
+    dst: epath.Path,
 ) -> None:
   """Download the remote dataset code locally to the dst path.
 
   Args:
     source: Source of the dataset.
-    dst: Empty directory on which copying the source
+    dst: Empty directory to which the source will be copied
   """
   # Download the files
   # Note: We do not check for file existance before copying/downloading it to
-  # not trigger unecessary queries when `source.root_path` is `GithubPath`.
+  # not trigger unnecessary queries when `source.root_path` is `GithubPath`.
   # A `FileNotFoundError` is triggered if the file can't be downloaded.
   for filename in source.filenames:
     path = source.root_path / filename

@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,12 +22,12 @@ import os
 import pickle
 from unittest import mock
 
+from etils import epath
 import promise
 
 import tensorflow as tf
 
 from tensorflow_datasets import testing
-from tensorflow_datasets.core import utils
 from tensorflow_datasets.core.download import checksums as checksums_lib
 from tensorflow_datasets.core.download import download_manager as dm
 from tensorflow_datasets.core.download import downloader
@@ -44,7 +44,7 @@ def _sha256(str_):
 
 
 def _as_path(nested_paths):
-  return tf.nest.map_structure(utils.as_path, nested_paths)
+  return tf.nest.map_structure(epath.Path, nested_paths)
 
 
 def _info_path(path):
@@ -62,7 +62,7 @@ class PathDict(collections.UserDict):
     return super().__getitem__(os.fspath(key))
 
   def __setitem__(self, key, value):
-    return super().__setitem__(os.fspath(key), utils.as_path(value))
+    return super().__setitem__(os.fspath(key), epath.Path(value))
 
 
 class Artifact(object):
@@ -78,9 +78,9 @@ class Artifact(object):
         filename=name,
     )
     self.file_name = resource_lib.get_dl_fname(url, self.url_info.checksum)
-    self.file_path = utils.as_path(f'/dl_dir/{self.file_name}')
+    self.file_path = epath.Path(f'/dl_dir/{self.file_name}')
     self.url_name = resource_lib.get_dl_fname(url, _sha256(url))
-    self.url_path = utils.as_path(f'/dl_dir/{self.url_name}')
+    self.url_path = epath.Path(f'/dl_dir/{self.url_name}')
 
 
 class DownloadManagerTest(testing.TestCase):
@@ -117,7 +117,7 @@ class DownloadManagerTest(testing.TestCase):
       path = os.path.join(tmpdir_path, filename)
       self.fs.add_file(path)
       dl_result = downloader.DownloadResult(
-          path=utils.as_path(path),
+          path=epath.Path(path),
           url_info=self.dl_results[url],
       )
       return promise.Promise.resolve(dl_result)
@@ -158,6 +158,8 @@ class DownloadManagerTest(testing.TestCase):
     self.fs.__enter__()
     self._make_downloader_mock().start()
     self._make_extractor_mock().start()
+    # Mock `_checksum_paths` (do not load the precomputed checksums)
+    mock.patch.object(checksums_lib, '_checksum_paths', lambda: {}).start()
 
     self.addCleanup(mock.patch.stopall)
 
@@ -166,7 +168,8 @@ class DownloadManagerTest(testing.TestCase):
     self.fs.__exit__(None, None, None)
 
   def assertContainFiles(self, filepaths):
-    self.assertCountEqual(_as_path(list(self.fs.files)), _as_path(filepaths))
+    for path in filepaths:
+      assert tf.io.gfile.exists(path)
 
   def _write_info(self, path, info):
     content = json.dumps(info)
@@ -179,6 +182,7 @@ class DownloadManagerTest(testing.TestCase):
                    extract_dir='/extract_dir',
                    manual_dir='/manual_dir',
                    **kwargs):
+    tf.io.gfile.mkdir('/checksums')
     manager = dm.DownloadManager(
         dataset_name='mnist',
         download_dir=dl_dir,
@@ -241,7 +245,7 @@ class DownloadManagerTest(testing.TestCase):
         'download': b.url,
     })
     expected = {
-        'manual': utils.as_path(a_manual_path),
+        'manual': epath.Path(a_manual_path),
         'download': b.file_path,
     }
     self.assertEqual(downloads, expected)
@@ -555,7 +559,7 @@ class DownloadManagerTest(testing.TestCase):
 
     # Checksums are created and url recorded
     self.assertEqual(
-        self.fs.files['/checksums/checksums.tsv'],
+        self.fs.read_file('/checksums/checksums.tsv'),
         f'{a.url}\t{a.url_info.size}\t{a.url_info.checksum}\t{a.url_info.filename}\n',
     )
 

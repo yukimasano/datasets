@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -688,6 +688,7 @@ class WmtTranslate(tfds.core.GeneratorBasedBuilder):
 
     manual_paths = {}
     urls_to_download = {}
+    downloaded_files = {}
     for ss_name in itertools.chain.from_iterable(self.subsets.values()):
       if ss_name == "czeng_17":
         # CzEng1.7 is CzEng1.6 with some blocks filtered out. We must download
@@ -698,10 +699,21 @@ class WmtTranslate(tfds.core.GeneratorBasedBuilder):
       if ds.get_manual_dl_files(source):
         manual_paths[ss_name] = _check_manual_files(ds)
       else:
-        urls_to_download[ss_name] = ds.get_url(source)
+        urls = ds.get_url(source)
+        # This domain throws a 503 if we attempt to download in parallel.
+        sequential_dl_urls = [url for url in urls if "www.statmt.org" in url]
+        parallel_dl_urls = [
+            url for url in urls if url not in sequential_dl_urls
+        ]
+        if sequential_dl_urls:
+          downloaded_files[ss_name] = [
+              dl_manager.download_and_extract(url) for url in sequential_dl_urls
+          ] + dl_manager.download_and_extract(parallel_dl_urls)
+        else:
+          urls_to_download[ss_name] = urls
 
     # Download and extract files from URLs.
-    downloaded_files = dl_manager.download_and_extract(urls_to_download)
+    downloaded_files.update(dl_manager.download_and_extract(urls_to_download))
     # Extract manually downloaded files.
     manual_files = dl_manager.extract(manual_paths)
 

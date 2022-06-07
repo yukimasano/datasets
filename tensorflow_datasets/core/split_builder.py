@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,21 +17,21 @@
 
 import collections.abc
 import contextlib
+import dataclasses
 import itertools
 import sys
 import typing
-from typing import Any, Callable, Dict, Iterator, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple, Union
 
 from absl import logging
-import dataclasses
-
+from tensorflow_datasets.core import example_serializer
 from tensorflow_datasets.core import features as features_lib
 from tensorflow_datasets.core import file_adapters
 from tensorflow_datasets.core import lazy_imports_lib
+from tensorflow_datasets.core import naming
 from tensorflow_datasets.core import splits as splits_lib
-from tensorflow_datasets.core import tfrecords_writer
 from tensorflow_datasets.core import utils
-from tensorflow_datasets.core.utils import type_utils
+from tensorflow_datasets.core import writer as writer_lib
 
 if typing.TYPE_CHECKING:
   import apache_beam as beam  # pytype: disable=import-error
@@ -77,6 +77,21 @@ class _SplitInfoFuture:
 
   def result(self) -> splits_lib.SplitInfo:
     return self._callback()
+
+
+@dataclasses.dataclass
+class PipelineProxy:
+  """Proxy which allows access to beam.Pipeline result after completion.
+
+  This is yielded by the maybe_beam_pipeline() context and can only be used if
+  beam is used to generate the dataset.
+  """
+
+  _beam_pipeline: Optional['beam.Pipeline']
+
+  @property
+  def result(self):
+    return self._beam_pipeline.result
 
 
 class SplitBuilder:
@@ -125,7 +140,7 @@ class SplitBuilder:
     self._file_format = file_format
 
   @contextlib.contextmanager
-  def maybe_beam_pipeline(self) -> Iterator[None]:
+  def maybe_beam_pipeline(self) -> Iterator[PipelineProxy]:
     """Context manager wrapping the beam pipeline.
 
     If Apache Beam is used, then the pipeline created withing the contextmanager
@@ -155,13 +170,16 @@ class SplitBuilder:
     never created and this function is a no-op.
 
     Yields:
-      None
+      PipelineProxy containing a reference to the beam pipeline, allowing access
+        to the pipeline result for (e.g) logging metrics to file.
     """
     self._in_contextmanager = True
     try:
       # Entering the contextmanager is a no-op. Only if Apache Beam is used
       # is the `beam.Pipeline` contextmanager activated.
-      yield
+      # Construct pipeline proxy with a placeholder beam pipeline.
+      pipeline_proxy = PipelineProxy(_beam_pipeline=None)
+      yield pipeline_proxy
     except Exception:  # pylint: disable=broad-except
       # Close and forward the exception
       if (not self._beam_pipeline or
@@ -171,6 +189,8 @@ class SplitBuilder:
       # If the Beam pipeline was used, then exit it.
       if self._beam_pipeline is not None:
         self._beam_pipeline.__exit__(None, None, None)
+        # Fill in the beam pipeline in the proxy.
+        pipeline_proxy._beam_pipeline = self._beam_pipeline  # pylint:disable=protected-access
     self._in_contextmanager = False
 
   @utils.memoized_property
@@ -263,7 +283,7 @@ class SplitBuilder:
       self,
       split_name: str,
       generator: SplitGenerator,
-      path: type_utils.PathLike,
+      filename_template: naming.ShardedFileTemplate,
       disable_shuffling: bool,
   ) -> _SplitInfoFuture:
     """Start the split generation.
@@ -271,7 +291,7 @@ class SplitBuilder:
     Args:
       split_name: Name of the split to generate
       generator: Generator, beam.PTransform,... yielding the examples
-      path: path where the split should be saved
+      filename_template: Template to format the filename for a shard.
       disable_shuffling: Specifies whether to shuffle the examples
 
     Returns:
@@ -282,7 +302,7 @@ class SplitBuilder:
     build_kwargs = dict(
         split_name=split_name,
         generator=generator,
-        path=path,
+        filename_template=filename_template,
         disable_shuffling=disable_shuffling,
     )
     # Depending on the type of generator, we use the corresponding
@@ -298,7 +318,7 @@ class SplitBuilder:
         import apache_beam as beam  # pylint: disable=g-import-not-at-top
       except ImportError:
         # Beam can't be imported, what was the object returned by the user ?
-        raise unknown_generator_type
+        raise unknown_generator_type  # pylint: disable=raise-missing-from
       if isinstance(generator, beam.PTransform):
         # Generate the beam.PCollection
         pcollection = self.beam_pipeline | split_name >> generator
@@ -313,7 +333,7 @@ class SplitBuilder:
       self,
       split_name: str,
       generator: Iterable[KeyExample],
-      path: type_utils.PathLike,
+      filename_template: naming.ShardedFileTemplate,
       disable_shuffling: bool,
   ) -> _SplitInfoFuture:
     """Split generator for example generators.
@@ -321,7 +341,7 @@ class SplitBuilder:
     Args:
       split_name: str,
       generator: Iterable[KeyExample],
-      path: type_utils.PathLike,
+      filename_template: Template to format the filename for a shard.
       disable_shuffling: Specifies whether to shuffle the examples,
 
     Returns:
@@ -341,11 +361,13 @@ class SplitBuilder:
       else:
         total_num_examples = None
 
-    writer = tfrecords_writer.Writer(
-        example_specs=self._features.get_serialized_info(),
-        path=path,
+    writer = writer_lib.Writer(
+        serializer=example_serializer.ExampleSerializer(
+            self._features.get_serialized_info()),
+        filename_template=filename_template,
         hash_salt=split_name,
         disable_shuffling=disable_shuffling,
+        # TODO(weide) remove this because it's already in filename_template?
         file_format=self._file_format,
     )
     for key, example in utils.tqdm(
@@ -366,6 +388,7 @@ class SplitBuilder:
         name=split_name,
         shard_lengths=shard_lengths,
         num_bytes=total_size,
+        filename_template=filename_template,
     )
     return _SplitInfoFuture(lambda: split_info)
 
@@ -373,16 +396,17 @@ class SplitBuilder:
       self,
       split_name: str,
       generator: 'beam.PCollection[KeyExample]',
-      path: type_utils.PathLike,
+      filename_template: naming.ShardedFileTemplate,
       disable_shuffling: bool,
   ) -> _SplitInfoFuture:
     """Split generator for `beam.PCollection`."""
     # TODO(tfds): Should try to add support to `max_examples_per_split`
     beam = lazy_imports_lib.lazy_imports.apache_beam
 
-    beam_writer = tfrecords_writer.BeamWriter(
-        example_specs=self._features.get_serialized_info(),
-        path=path,
+    beam_writer = writer_lib.BeamWriter(
+        serializer=example_serializer.ExampleSerializer(
+            self._features.get_serialized_info()),
+        filename_template=filename_template,
         hash_salt=split_name,
         disable_shuffling=disable_shuffling,
         file_format=self._file_format,
@@ -414,6 +438,7 @@ class SplitBuilder:
           name=split_name,
           shard_lengths=shard_lengths,
           num_bytes=total_size,
+          filename_template=filename_template,
       )
 
     return _SplitInfoFuture(_resolve_future)

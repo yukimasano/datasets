@@ -45,6 +45,10 @@ heuristic algorithms: Source, Family, and Qualities.
     ([tfds.show_examples](https://www.tensorflow.org/datasets/api_docs/python/tfds/visualization/show_examples)):
     Not supported.
 
+*   **Examples**
+    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
+    Missing.
+
 *   **Citation**:
 
 ```
@@ -65,6 +69,7 @@ heuristic algorithms: Source, Family, and Qualities.
 }
 ```
 
+
 ## nsynth/full (default config)
 
 *   **Config description**: Full NSynth Dataset is split into train, valid, and
@@ -83,7 +88,7 @@ Split     | Examples
 `'train'` | 289,205
 `'valid'` | 12,678
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
@@ -111,39 +116,30 @@ FeaturesDict({
 })
 ```
 
-*   **Examples**
-    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
+*   **Feature documentation**:
 
-<!-- mdformat off(HTML should not be auto-formatted) -->
-
-{% framebox %}
-
-<button id="displaydataframe">Display examples...</button>
-<div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
-<script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/nsynth-full-2.3.3.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
-
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
-        'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
-});
-</script>
-
-{% endframebox %}
-
-<!-- mdformat on -->
+Feature                 | Class        | Shape    | Dtype      | Description
+:---------------------- | :----------- | :------- | :--------- | :----------
+                        | FeaturesDict |          |            |
+audio                   | Audio        | (64000,) | tf.float32 |
+id                      | Tensor       |          | tf.string  |
+instrument              | FeaturesDict |          |            |
+instrument/family       | ClassLabel   |          | tf.int64   |
+instrument/label        | ClassLabel   |          | tf.int64   |
+instrument/source       | ClassLabel   |          | tf.int64   |
+pitch                   | ClassLabel   |          | tf.int64   |
+qualities               | FeaturesDict |          |            |
+qualities/bright        | Tensor       |          | tf.bool    |
+qualities/dark          | Tensor       |          | tf.bool    |
+qualities/distortion    | Tensor       |          | tf.bool    |
+qualities/fast_decay    | Tensor       |          | tf.bool    |
+qualities/long_release  | Tensor       |          | tf.bool    |
+qualities/multiphonic   | Tensor       |          | tf.bool    |
+qualities/nonlinear_env | Tensor       |          | tf.bool    |
+qualities/percussive    | Tensor       |          | tf.bool    |
+qualities/reverb        | Tensor       |          | tf.bool    |
+qualities/tempo-synced  | Tensor       |          | tf.bool    |
+velocity                | ClassLabel   |          | tf.int64   |
 
 ## nsynth/gansynth_subset
 
@@ -165,7 +161,7 @@ Split     | Examples
 `'train'` | 60,788
 `'valid'` | 17,469
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
@@ -193,39 +189,30 @@ FeaturesDict({
 })
 ```
 
-*   **Examples**
-    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
+*   **Feature documentation**:
 
-<!-- mdformat off(HTML should not be auto-formatted) -->
-
-{% framebox %}
-
-<button id="displaydataframe">Display examples...</button>
-<div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
-<script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/nsynth-gansynth_subset-2.3.3.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
-
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
-        'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
-});
-</script>
-
-{% endframebox %}
-
-<!-- mdformat on -->
+Feature                 | Class        | Shape    | Dtype      | Description
+:---------------------- | :----------- | :------- | :--------- | :----------
+                        | FeaturesDict |          |            |
+audio                   | Audio        | (64000,) | tf.float32 |
+id                      | Tensor       |          | tf.string  |
+instrument              | FeaturesDict |          |            |
+instrument/family       | ClassLabel   |          | tf.int64   |
+instrument/label        | ClassLabel   |          | tf.int64   |
+instrument/source       | ClassLabel   |          | tf.int64   |
+pitch                   | ClassLabel   |          | tf.int64   |
+qualities               | FeaturesDict |          |            |
+qualities/bright        | Tensor       |          | tf.bool    |
+qualities/dark          | Tensor       |          | tf.bool    |
+qualities/distortion    | Tensor       |          | tf.bool    |
+qualities/fast_decay    | Tensor       |          | tf.bool    |
+qualities/long_release  | Tensor       |          | tf.bool    |
+qualities/multiphonic   | Tensor       |          | tf.bool    |
+qualities/nonlinear_env | Tensor       |          | tf.bool    |
+qualities/percussive    | Tensor       |          | tf.bool    |
+qualities/reverb        | Tensor       |          | tf.bool    |
+qualities/tempo-synced  | Tensor       |          | tf.bool    |
+velocity                | ClassLabel   |          | tf.int64   |
 
 ## nsynth/gansynth_subset.f0_and_loudness
 
@@ -249,7 +236,7 @@ Split     | Examples
 `'train'` | 60,788
 `'valid'` | 17,469
 
-*   **Features**:
+*   **Feature structure**:
 
 ```python
 FeaturesDict({
@@ -285,36 +272,33 @@ FeaturesDict({
 })
 ```
 
-*   **Examples**
-    ([tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)):
+*   **Feature documentation**:
 
-<!-- mdformat off(HTML should not be auto-formatted) -->
-
-{% framebox %}
-
-<button id="displaydataframe">Display examples...</button>
-<div id="dataframecontent" style="overflow-x:auto"></div>
-<script src="https://www.gstatic.com/external_hosted/jquery2.min.js"></script>
-<script>
-var url = "https://storage.googleapis.com/tfds-data/visualization/dataframe/nsynth-gansynth_subset.f0_and_loudness-2.3.3.html";
-$(document).ready(() => {
-  $("#displaydataframe").click((event) => {
-    // Disable the button after clicking (dataframe loaded only once).
-    $("#displaydataframe").prop("disabled", true);
-
-    // Pre-fetch and display the content
-    $.get(url, (data) => {
-      $("#dataframecontent").html(data);
-    }).fail(() => {
-      $("#dataframecontent").html(
-        'Error loading examples. If the error persist, please open '
-        + 'a new issue.'
-      );
-    });
-  });
-});
-</script>
-
-{% endframebox %}
-
-<!-- mdformat on -->
+Feature                 | Class        | Shape    | Dtype      | Description
+:---------------------- | :----------- | :------- | :--------- | :----------
+                        | FeaturesDict |          |            |
+audio                   | Audio        | (64000,) | tf.float32 |
+f0                      | FeaturesDict |          |            |
+f0/confidence           | Tensor       | (1000,)  | tf.float32 |
+f0/hz                   | Tensor       | (1000,)  | tf.float32 |
+f0/midi                 | Tensor       | (1000,)  | tf.float32 |
+id                      | Tensor       |          | tf.string  |
+instrument              | FeaturesDict |          |            |
+instrument/family       | ClassLabel   |          | tf.int64   |
+instrument/label        | ClassLabel   |          | tf.int64   |
+instrument/source       | ClassLabel   |          | tf.int64   |
+loudness                | FeaturesDict |          |            |
+loudness/db             | Tensor       | (1000,)  | tf.float32 |
+pitch                   | ClassLabel   |          | tf.int64   |
+qualities               | FeaturesDict |          |            |
+qualities/bright        | Tensor       |          | tf.bool    |
+qualities/dark          | Tensor       |          | tf.bool    |
+qualities/distortion    | Tensor       |          | tf.bool    |
+qualities/fast_decay    | Tensor       |          | tf.bool    |
+qualities/long_release  | Tensor       |          | tf.bool    |
+qualities/multiphonic   | Tensor       |          | tf.bool    |
+qualities/nonlinear_env | Tensor       |          | tf.bool    |
+qualities/percussive    | Tensor       |          | tf.bool    |
+qualities/reverb        | Tensor       |          | tf.bool    |
+qualities/tempo-synced  | Tensor       |          | tf.bool    |
+velocity                | ClassLabel   |          | tf.int64   |

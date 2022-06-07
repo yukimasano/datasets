@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,39 +49,54 @@ class DatasetConfig(tfds.core.BuilderConfig):
   overall_description: str = ''
   homepage: str = ''
   citation: str = ''
-  observation_info: tfds.features.FeatureConnector = None
-  action_info: tfds.features.FeatureConnector = None
-  reward_info: tfds.features.FeatureConnector = None
-  discount_info: tfds.features.FeatureConnector = None
+  observation_info: Optional[tfds.typing.FeatureConnectorArg] = None
+  action_info: Optional[tfds.features.FeatureConnector] = None
+  reward_info: Optional[tfds.features.FeatureConnector] = None
+  discount_info: Optional[tfds.features.FeatureConnector] = None
   step_metadata_info: Optional[Dict[str, tfds.features.FeatureConnector]] = None
   episode_metadata_info: Optional[Dict[str,
                                        tfds.features.FeatureConnector]] = None
   supervised_keys: Optional[Tuple[Any]] = None
 
 
-def build_info(ds_config: DatasetConfig,
-               builder: tfds.core.DatasetBuilder) -> tfds.core.DatasetInfo:
+def build_info(
+    ds_config: DatasetConfig,
+    builder: tfds.core.DatasetBuilder,
+    ds_metadata: Optional[Dict[Any, Any]] = None) -> tfds.core.DatasetInfo:
   """Returns the dataset metadata."""
+  step_metadata = ds_config.step_metadata_info
+  if step_metadata is None:
+    step_metadata = {}
+  episode_metadata = ds_config.episode_metadata_info
+  if episode_metadata is None:
+    episode_metadata = {}
+  step_info = {
+      'is_terminal': tf.bool,
+      'is_first': tf.bool,
+      'is_last': tf.bool,
+      **step_metadata,
+  }
+  if ds_config.observation_info:
+    step_info['observation'] = ds_config.observation_info
+  if ds_config.action_info:
+    step_info['action'] = ds_config.action_info
+  if ds_config.reward_info:
+    step_info['reward'] = ds_config.reward_info
+  if ds_config.discount_info:
+    step_info['discount'] = ds_config.discount_info
+  if ds_metadata:
+    ds_metadata = tfds.core.MetadataDict(ds_metadata)
   return tfds.core.DatasetInfo(
       builder=builder,
       description=ds_config.overall_description,
       features=tfds.features.FeaturesDict({
-          'steps':
-              tfds.features.Dataset({
-                  'observation': ds_config.observation_info,
-                  'action': ds_config.action_info,
-                  'reward': ds_config.reward_info,
-                  'is_terminal': tf.bool,
-                  'is_first': tf.bool,
-                  'is_last': tf.bool,
-                  'discount': ds_config.discount_info,
-                  **ds_config.step_metadata_info,
-              }),
-          **ds_config.episode_metadata_info,
+          'steps': tfds.features.Dataset(step_info),
+          **episode_metadata,
       }),
       supervised_keys=ds_config.supervised_keys,
       homepage=ds_config.homepage,
       citation=ds_config.citation,
+      metadata=ds_metadata,
   )
 
 

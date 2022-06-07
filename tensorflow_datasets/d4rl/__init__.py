@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ from tensorflow_datasets.d4rl.d4rl_adroit_door import D4rlAdroitDoor
 from tensorflow_datasets.d4rl.d4rl_adroit_hammer import D4rlAdroitHammer
 from tensorflow_datasets.d4rl.d4rl_adroit_pen import D4rlAdroitPen
 from tensorflow_datasets.d4rl.d4rl_adroit_relocate import D4rlAdroitRelocate
+from tensorflow_datasets.d4rl.d4rl_antmaze import D4rlAntmaze
 from tensorflow_datasets.d4rl.d4rl_mujoco_ant import D4rlMujocoAnt
 from tensorflow_datasets.d4rl.d4rl_mujoco_halfcheetah import D4rlMujocoHalfcheetah
 from tensorflow_datasets.d4rl.d4rl_mujoco_hopper import D4rlMujocoHopper

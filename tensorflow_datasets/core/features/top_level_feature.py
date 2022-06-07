@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2021 The TensorFlow Datasets Authors.
+# Copyright 2022 The TensorFlow Datasets Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,9 @@
 
 """Wrapper around FeatureDict to allow better control over decoding."""
 
-from typing import Union
+from __future__ import annotations
+
+from typing import Any, Union
 
 import tensorflow as tf
 from tensorflow_datasets.core import utils
@@ -41,7 +43,7 @@ class TopLevelFeature(feature_lib.FeatureConnector):
       decoders: Nested dict of `Decoder` objects which allow to customize the
         decoding. The structure should match the feature structure, but only
         customized feature keys need to be present. See [the
-          guide](https://github.com/tensorflow/datasets/tree/master/docs/decode.md)
+          guide](https://github.com/tensorflow/datasets/blob/master/docs/decode.md)
             for more info.
 
     Returns:
@@ -108,6 +110,15 @@ class TopLevelFeature(feature_lib.FeatureConnector):
     """
     example_data = self._example_parser.parse_example(serialized_example)
     return self.decode_example(example_data, decoders=decoders)
+
+  @property
+  def tf_example_spec(self) -> dict[str, Any]:
+    """Returns the `tf.Example` proto structure.
+
+    Returns:
+      The flat `dict[str, tf.io.FixedLenFeature | tf.io.XyzFeature | ...]`
+    """
+    return self._example_parser.flat_feature_specs
 
   @utils.memoized_property
   def _example_parser(self):

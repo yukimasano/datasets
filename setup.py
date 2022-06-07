@@ -1,3 +1,18 @@
+# coding=utf-8
+# Copyright 2022 The TensorFlow Datasets Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """tensorflow/datasets is a library of datasets ready to use with TensorFlow.
 
 tensorflow/datasets is a library of public datasets ready to use with
@@ -28,26 +43,25 @@ else:
 project_name = 'tensorflow-datasets'
 
 # To enable importing version.py directly, we add its path to sys.path.
-version_path = os.path.join(
-    os.path.dirname(__file__), 'tensorflow_datasets')
+version_path = os.path.join(os.path.dirname(__file__), 'tensorflow_datasets')
 sys.path.append(version_path)
 from version import __version__  # pytype: disable=import-error  # pylint: disable=g-import-not-at-top
 
 if nightly:
   project_name = 'tfds-nightly'
   # Version as `X.Y.Z.dev199912312459`
-  datestring = (os.environ.get('TFDS_NIGHTLY_TIMESTAMP') or
-                datetime.datetime.now().strftime('%Y%m%d%H%M'))
+  datestring = (
+      os.environ.get('TFDS_NIGHTLY_TIMESTAMP') or
+      datetime.datetime.now().strftime('%Y%m%d%H%M'))
   curr_version = pkg_resources.parse_version(__version__)
   __version__ = f'{curr_version.base_version}.dev{datestring}'
-
 
 DOCLINES = __doc__.split('\n')
 
 REQUIRED_PKGS = [
     'absl-py',
     'dill',  # TODO(tfds): move to TESTS_REQUIRE.
-    'future',
+    'etils[epath]',
     'numpy',
     'promise',
     'protobuf>=3.12.2',
@@ -55,6 +69,7 @@ REQUIRED_PKGS = [
     'six',
     'tensorflow-metadata',
     'termcolor',
+    'toml',
     'tqdm',
     # Standard library backports
     'dataclasses;python_version<"3.7"',
@@ -63,8 +78,10 @@ REQUIRED_PKGS = [
 ]
 
 TESTS_REQUIRE = [
+    'jax[cpu]',
     'jupyter',
     'pytest',
+    'pytest-shard',
     'pytest-xdist',
     # Lazy-deps required by core
     'pandas',
@@ -108,6 +125,7 @@ DATASET_FILES = [
     'image_classification/sun397_tfds_te.txt',
     'image_classification/sun397_tfds_tr.txt',
     'image_classification/sun397_tfds_va.txt',
+    'object_detection/lvis/lvis_classes.txt',
     'object_detection/open_images_classes_all.txt',
     'object_detection/open_images_classes_boxable.txt',
     'object_detection/open_images_classes_trainable.txt',
@@ -120,6 +138,8 @@ DATASET_FILES = [
 DATASET_EXTRAS = {
     # In alphabetical order
     'aflw2k3d': ['scipy'],
+    'beir': ['apache_beam'],
+    'ble_wind_field': ['gcsfs', 'zarr'],
     'c4': ['apache_beam', 'gcld3', 'langdetect', 'nltk', 'tldextract'],
     'cats_vs_dogs': ['matplotlib'],
     'colorectal_histology': ['Pillow'],
@@ -145,14 +165,15 @@ DATASET_EXTRAS = {
     'pet_finder': ['pandas'],
     'robonet': ['h5py'],  # and ffmpeg installed
     'robosuite_panda_pick_place_can': ['envlogger'],
+    'smartwatch_gestures': ['pandas'],
     'svhn': ['scipy'],
     'the300w_lp': ['scipy'],
     'wider_face': ['Pillow'],
+    'wiki_dialog': ['apache_beam'],
     'wikipedia': ['mwparserfromhell', 'apache_beam'],
     'wsc273': ['bs4', 'lxml'],
     'youtube_vis': ['pycocotools'],
 }
-
 
 # Those datasets have dependencies which conflict with the rest of TFDS, so
 # running them in an isolated environments.
@@ -160,11 +181,10 @@ DATASET_EXTRAS = {
 ISOLATED_DATASETS = ('nsynth', 'lsun')
 
 # Extra dataset deps are required for the tests
-all_dataset_extras = list(itertools.chain.from_iterable(
-    deps for ds_name, deps in DATASET_EXTRAS.items()
-    if ds_name not in ISOLATED_DATASETS
-))
-
+all_dataset_extras = list(
+    itertools.chain.from_iterable(
+        deps for ds_name, deps in DATASET_EXTRAS.items()
+        if ds_name not in ISOLATED_DATASETS))
 
 EXTRAS_REQUIRE = {
     'matplotlib': ['matplotlib'],
@@ -190,21 +210,21 @@ setup(
     license='Apache 2.0',
     packages=find_packages(),
     package_data={
-        'tensorflow_datasets': DATASET_FILES + [
-            'core/utils/colormap.csv',
-            'scripts/documentation/templates/*',
-            'url_checksums/*',
-            'checksums.tsv',
-        ],
+        'tensorflow_datasets':
+            DATASET_FILES + [
+                'core/utils/colormap.csv',
+                'scripts/documentation/templates/*',
+                'url_checksums/*',
+                'checksums.tsv',
+                'community-datasets.toml',
+            ],
     },
     exclude_package_data={
-        'tensorflow_datasets': [
-            'dummy_data/*',
-        ],
+        'tensorflow_datasets': ['dummy_data/*',],
     },
     scripts=[],
     install_requires=REQUIRED_PKGS,
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     extras_require=EXTRAS_REQUIRE,
     classifiers=[
         'Development Status :: 4 - Beta',
